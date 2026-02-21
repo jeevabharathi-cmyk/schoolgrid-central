@@ -1,0 +1,121 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { GraduationCap, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const Login = () => {
+  const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginType, setLoginType] = useState<"admin" | "teacher" | "parent">("admin");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginType === "admin") navigate("/admin");
+    else if (loginType === "teacher") navigate("/teacher");
+    else navigate("/parent");
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        <div className="rounded-xl border border-border bg-card p-8 shadow-lg">
+          <div className="mb-8 flex flex-col items-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary">
+              <GraduationCap className="h-7 w-7 text-primary-foreground" />
+            </div>
+            <h1 className="text-2xl font-bold text-foreground">SchoolConnect Pro</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
+          </div>
+
+          <div className="mb-6 flex gap-1 rounded-lg bg-secondary p-1">
+            {(["admin", "teacher", "parent"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setLoginType(type)}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium capitalize transition-all ${
+                  loginType === type
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {loginType === "admin" ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="admin@school.edu"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="remember" />
+                    <Label htmlFor="remember" className="text-sm font-normal">Remember me</Label>
+                  </div>
+                  <button type="button" className="text-sm text-primary hover:underline">
+                    Forgot password?
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                />
+                <p className="text-xs text-muted-foreground">We'll send you a one-time verification code</p>
+              </div>
+            )}
+            <Button type="submit" className="w-full">
+              {loginType === "admin" ? "Sign In" : "Send OTP"}
+            </Button>
+          </form>
+        </div>
+        <p className="mt-4 text-center text-xs text-muted-foreground">SchoolConnect Pro v1.0</p>
+      </motion.div>
+    </div>
+  );
+};
+
+export default Login;
