@@ -11,11 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+<<<<<<< HEAD
 import { ProfileDropdown } from "@/components/ProfileDropdown";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
+=======
+import HelpCenter from "@/components/HelpCenter";
+>>>>>>> d18e1e5b7c2cfe3877d8d96b693b0c8fada41d75
 
 const children = [
   { id: 1, name: "Aarav", appNo: "APP-2024-001", class: "8A" },
@@ -358,6 +362,7 @@ const ParentApp = () => {
             </button>
           ))}
         </div>
+        <HelpCenter isMobileMockup />
       </div>
 
       {/* Doubt Submission Dialog — renders via portal, not clipped by phone frame */}

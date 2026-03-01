@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
 } from "@/components/ui/dialog";
+<<<<<<< HEAD
 import { getAllStatuses, subscribe } from "@/homeworkStore";
 import { initializeSession, getSession } from "@/authStore";
 import { CheckCircle } from "lucide-react";
@@ -28,6 +29,9 @@ import {
 } from "@/doubtStore";
 
 const TEACHER_ID = "TCH-2024-001";
+=======
+import HelpCenter from "@/components/HelpCenter";
+>>>>>>> d18e1e5b7c2cfe3877d8d96b693b0c8fada41d75
 
 const assignedClasses = [
   { id: 1, name: "Class 8A", subject: "Mathematics", schedule: "Mon, Wed, Fri - 9:00 AM" },
@@ -367,6 +371,7 @@ const TeacherApp = () => {
             </button>
           ))}
         </div>
+        <HelpCenter isMobileMockup className="!bottom-36" />
       </div>
 
       {/* Doubts View & Reply Dialog — portal-rendered, outside phone frame */}
