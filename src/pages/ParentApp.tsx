@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import HelpCenter from "@/components/HelpCenter";
 
 const children = [
   { id: 1, name: "Aarav", class: "8A" },
@@ -62,11 +63,10 @@ const ParentApp = () => {
                   <button
                     key={child.id}
                     onClick={() => setSelectedChild(child.id)}
-                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                      selectedChild === child.id
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-muted-foreground"
-                    }`}
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${selectedChild === child.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground"
+                      }`}
                   >
                     {child.name} · {child.class}
                   </button>
@@ -187,15 +187,15 @@ const ParentApp = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors ${
-                activeTab === tab.id ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors ${activeTab === tab.id ? "text-primary" : "text-muted-foreground"
+                }`}
             >
               <tab.icon className="h-5 w-5" />
               <span>{tab.label}</span>
             </button>
           ))}
         </div>
+        <HelpCenter isMobileMockup />
       </div>
     </div>
   );

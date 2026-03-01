@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import HelpCenter from "@/components/HelpCenter";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
@@ -225,6 +226,7 @@ const AdminLayout = () => {
         <main className="flex-1 p-4 lg:p-6">
           <Outlet />
         </main>
+        <HelpCenter />
       </div>
     </div>
   );

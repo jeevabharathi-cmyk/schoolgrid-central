@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter
 } from "@/components/ui/dialog";
+import HelpCenter from "@/components/HelpCenter";
 
 const assignedClasses = [
   { id: 1, name: "Class 8A", subject: "Mathematics", schedule: "Mon, Wed, Fri - 9:00 AM" },
@@ -166,15 +167,15 @@ const TeacherApp = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-1 text-xs transition-colors ${
-                activeTab === tab.id ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`flex flex-col items-center gap-0.5 px-4 py-1 text-xs transition-colors ${activeTab === tab.id ? "text-primary" : "text-muted-foreground"
+                }`}
             >
               <tab.icon className="h-5 w-5" />
               <span>{tab.label}</span>
             </button>
           ))}
         </div>
+        <HelpCenter isMobileMockup className="!bottom-36" />
       </div>
     </div>
   );
