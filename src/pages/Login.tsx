@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { GraduationCap, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,11 +16,28 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loginType, setLoginType] = useState<"admin" | "teacher" | "parent">("admin");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginType === "admin") navigate("/admin");
-    else if (loginType === "teacher") navigate("/teacher");
-    else navigate("/parent");
+    if (loginType === "admin") {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          toast.error("Invalid credentials or no admin user exists yet!");
+          return;
+        }
+        toast.success("Successfully logged in!");
+        navigate("/admin");
+      } catch (err: any) {
+        toast.error(err.message);
+      }
+    } else {
+      toast.info("OTP login for Teachers/Parents is not fully integrated yet. Redirecting...");
+      if (loginType === "teacher") navigate("/teacher");
+      else navigate("/parent");
+    }
   };
 
   return (
