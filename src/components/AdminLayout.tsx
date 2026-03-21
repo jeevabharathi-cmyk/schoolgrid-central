@@ -1,17 +1,20 @@
 import { useState } from "react";
-import { NavLink, useLocation, Outlet } from "react-router-dom";
+import { NavLink, useLocation, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Settings, Grid3X3, BookOpen, Users, GraduationCap,
   Link2, Bell, BarChart3, SlidersHorizontal, GraduationCap as Logo,
-  Menu, X, LogOut, ChevronDown
+  Menu, X, LogOut, ChevronDown, CalendarDays
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ProfileDropdown } from "@/components/ProfileDropdown";
+import HelpCenter from "@/components/HelpCenter";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
   { title: "School Setup", icon: Settings, path: "/admin/setup" },
   { title: "Classes & Sections", icon: Grid3X3, path: "/admin/classes" },
+  { title: "Timetable", icon: CalendarDays, path: "/admin/timetable" },
   { title: "Subjects", icon: BookOpen, path: "/admin/subjects" },
   { title: "Teachers", icon: Users, path: "/admin/teachers" },
   { title: "Students", icon: GraduationCap, path: "/admin/students" },
@@ -23,15 +26,32 @@ const menuItems = [
 
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    setProfileOpen(false);
+    navigate("/");
+  };
+
+  const adminUser = {
+    name: "Administrator",
+    email: "admin@school.edu",
+    role: "SUPER ADMIN" as const,
+    avatar: "AD",
+    school: "Delhi Public School",
+    academicYear: "2024 - 2025",
+    lastLogin: "Today, 9:41 AM",
+    status: "Active" as const,
+  };
 
   return (
     <div className="flex min-h-screen w-full">
       {/* Sidebar */}
       <aside
-        className={`sidebar-gradient fixed inset-y-0 left-0 z-30 flex flex-col border-r border-sidebar-border transition-all duration-300 ${
-          sidebarOpen ? "w-64" : "w-0 -translate-x-full lg:w-16 lg:translate-x-0"
-        }`}
+        className={`sidebar-gradient fixed inset-y-0 left-0 z-30 flex flex-col border-r border-sidebar-border transition-all duration-300 ${sidebarOpen ? "w-64" : "w-0 -translate-x-full lg:w-16 lg:translate-x-0"
+          }`}
       >
         <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
@@ -56,11 +76,10 @@ const AdminLayout = () => {
                 <li key={item.path}>
                   <NavLink
                     to={item.path}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-sidebar-accent text-sidebar-primary"
-                        : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                    }`}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive
+                      ? "bg-sidebar-accent text-sidebar-primary"
+                      : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      }`}
                   >
                     <item.icon className="h-4.5 w-4.5 shrink-0" />
                     {sidebarOpen && <span>{item.title}</span>}
@@ -72,7 +91,10 @@ const AdminLayout = () => {
         </nav>
 
         <div className="border-t border-sidebar-border p-3">
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground">
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          >
             <LogOut className="h-4 w-4 shrink-0" />
             {sidebarOpen && <span>Logout</span>}
           </button>
@@ -100,20 +122,16 @@ const AdminLayout = () => {
               <Bell className="h-5 w-5" />
               <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
             </button>
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-xs text-primary-foreground">AD</AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium text-foreground sm:inline">Admin</span>
-            </div>
+            <ProfileDropdown user={adminUser} />
           </div>
         </header>
 
         <main className="flex-1 p-4 lg:p-6">
           <Outlet />
         </main>
-      </div>
-    </div>
+        <HelpCenter />
+      </div >
+    </div >
   );
 };
 
