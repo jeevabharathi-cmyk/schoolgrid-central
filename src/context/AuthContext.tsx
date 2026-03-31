@@ -87,12 +87,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, metadata?: Record<string, unknown>) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: metadata },
-    });
-    return { error: error as Error | null };
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata },
+      });
+
+      if (error) {
+        // Enhance the error message for rate limiting
+        if (error.message.includes("email rate limit exceeded")) {
+          return { 
+            error: new Error("Supabase email rate limit exceeded. Please disable email confirmation in your Supabase Dashboard (Authentication > Providers > Email) to bypass this during development."),
+            isRateLimit: true 
+          };
+        }
+        return { error: error as Error | null };
+      }
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error | null };
+    }
   };
 
   const signOut = async () => {

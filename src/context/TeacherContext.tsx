@@ -1,55 +1,150 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 export type Teacher = {
-    id: number;
-    name: string;
-    phone: string;
-    email: string;
-    subjects: string[];
-    classes: string[];
-    status: "active" | "inactive";
-    address?: string;
-    joiningDate?: string;
+  id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  subjects: string[];
+  classes: string[];
+  status: "active" | "inactive";
+  department: string | null;
+  address: string | null;
+  joining_date: string | null;
+  school_id: string | null;
+};
+
+// Shape coming from the "Add Teacher" form
+export type NewTeacher = {
+  name: string;
+  phone: string;
+  email: string;
+  subjects: string[];
+  classes: string[];
+  status: "active" | "inactive";
+  address?: string;
+  joiningDate?: string;
 };
 
 interface TeacherContextType {
-    teachers: Teacher[];
-    addTeacher: (teacher: Omit<Teacher, "id">) => void;
+  teachers: Teacher[];
+  loading: boolean;
+  addTeacher: (teacher: NewTeacher) => Promise<{ error: string | null }>;
+  deleteTeacher: (id: string) => Promise<void>;
+  refreshTeachers: () => Promise<void>;
 }
-
-const initialTeachers: Teacher[] = [
-    { id: 1, name: "Mrs. Anita Sharma", phone: "+91 98765 43210", email: "anita.sharma@school.edu", subjects: ["Mathematics"], classes: ["8A", "9B"], status: "active" },
-    { id: 2, name: "Mr. Rajesh Patel", phone: "+91 98765 43211", email: "rajesh.patel@school.edu", subjects: ["Science"], classes: ["10A", "10B"], status: "active" },
-    { id: 3, name: "Mrs. Priya Kumar", phone: "+91 98765 43212", email: "priya.kumar@school.edu", subjects: ["English"], classes: ["7A", "7B", "7C"], status: "active" },
-    { id: 4, name: "Mr. Suresh Gupta", phone: "+91 98765 43213", email: "suresh.gupta@school.edu", subjects: ["Hindi"], classes: ["6A", "6B"], status: "inactive" },
-    { id: 5, name: "Mrs. Deepa Nair", phone: "+91 98765 43214", email: "deepa.nair@school.edu", subjects: ["Social Science"], classes: ["8B", "9A"], status: "active" },
-    { id: 6, name: "Mr. Vikram Singh", phone: "+91 98765 43215", email: "vikram.singh@school.edu", subjects: ["Physical Education"], classes: ["All"], status: "active" },
-];
 
 const TeacherContext = createContext<TeacherContextType | undefined>(undefined);
 
 export const TeacherProvider = ({ children }: { children: ReactNode }) => {
-    const [teachers, setTeachers] = useState<Teacher[]>(initialTeachers);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { session } = useAuth();
 
-    const addTeacher = (newTeacher: Omit<Teacher, "id">) => {
-        const teacherWithId = {
-            ...newTeacher,
-            id: Math.max(0, ...teachers.map(t => t.id)) + 1,
-        };
-        setTeachers((prev) => [teacherWithId, ...prev]);
-    };
+  const fetchTeachers = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("teachers")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    return (
-        <TeacherContext.Provider value={{ teachers, addTeacher }}>
-            {children}
-        </TeacherContext.Provider>
-    );
+    if (error) {
+      console.warn("Error fetching teachers:", error.message);
+      setTeachers([]);
+    } else {
+      setTeachers(
+        (data || []).map((t: any) => ({
+          id: t.id,
+          full_name: t.full_name,
+          phone: t.phone || "",
+          email: t.email || "",
+          subjects: t.subjects || [],
+          classes: t.classes || [],
+          status: t.status || "active",
+          department: t.department,
+          address: t.address,
+          joining_date: t.joining_date,
+          school_id: t.school_id,
+        }))
+      );
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (session) {
+      fetchTeachers();
+    }
+  }, [session, fetchTeachers]);
+
+  const addTeacher = async (newTeacher: NewTeacher): Promise<{ error: string | null }> => {
+    // Get the admin user's school_id from their JWT metadata or profile
+    const schoolId = session?.user?.user_metadata?.school_id || null;
+
+    const { data, error } = await supabase
+      .from("teachers")
+      .insert({
+        full_name: newTeacher.name,
+        phone: newTeacher.phone,
+        email: newTeacher.email || null,
+        subjects: newTeacher.subjects,
+        classes: newTeacher.classes,
+        status: newTeacher.status || "active",
+        address: newTeacher.address || null,
+        joining_date: newTeacher.joiningDate || null,
+        school_id: schoolId,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding teacher:", error);
+      return { error: error.message };
+    }
+
+    // Add to local state immediately
+    if (data) {
+      setTeachers((prev) => [
+        {
+          id: data.id,
+          full_name: data.full_name,
+          phone: data.phone || "",
+          email: data.email || "",
+          subjects: data.subjects || [],
+          classes: data.classes || [],
+          status: data.status || "active",
+          department: data.department,
+          address: data.address,
+          joining_date: data.joining_date,
+          school_id: data.school_id,
+        },
+        ...prev,
+      ]);
+    }
+
+    return { error: null };
+  };
+
+  const deleteTeacher = async (id: string) => {
+    const { error } = await supabase.from("teachers").delete().eq("id", id);
+    if (!error) {
+      setTeachers((prev) => prev.filter((t) => t.id !== id));
+    }
+  };
+
+  return (
+    <TeacherContext.Provider value={{ teachers, loading, addTeacher, deleteTeacher, refreshTeachers: fetchTeachers }}>
+      {children}
+    </TeacherContext.Provider>
+  );
 };
 
 export const useTeachers = () => {
-    const context = useContext(TeacherContext);
-    if (context === undefined) {
-        throw new Error("useTeachers must be used within a TeacherProvider");
-    }
-    return context;
+  const context = useContext(TeacherContext);
+  if (context === undefined) {
+    throw new Error("useTeachers must be used within a TeacherProvider");
+  }
+  return context;
 };

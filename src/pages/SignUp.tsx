@@ -62,6 +62,7 @@ const SignUp = () => {
         title: "Sign Up Failed",
         description: error.message || "Could not create account.",
         variant: "destructive",
+        duration: 8000, // Show for longer to allow reading the instruction
       });
       return;
     }

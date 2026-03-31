@@ -1,58 +1,144 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 export type Student = {
-    id: number;
-    name: string;
-    admNo: string;
-    class: string;
-    section: string;
-    parent: string;
-    email?: string;
-    phone?: string;
-    dob?: string;
-    address?: string;
+  id: string;
+  name: string;
+  admNo: string;
+  class: string;
+  section: string;
+  parent: string;
+  email?: string;
+  phone?: string;
+  dob?: string;
+  address?: string;
+};
+
+// Shape from the "Add Student" form
+export type NewStudent = {
+  name: string;
+  admNo: string;
+  class: string;
+  section: string;
+  parent: string;
+  email?: string;
+  phone?: string;
+  dob?: string;
+  address?: string;
 };
 
 interface StudentContextType {
-    students: Student[];
-    enrollStudent: (student: Omit<Student, "id">) => void;
+  students: Student[];
+  loading: boolean;
+  enrollStudent: (student: NewStudent) => Promise<{ error: string | null }>;
+  deleteStudent: (id: string) => Promise<void>;
+  refreshStudents: () => Promise<void>;
 }
-
-const initialStudents: Student[] = [
-    { id: 1, name: "Aarav Mehta", admNo: "2024001", class: "8", section: "A", parent: "Mr. Sunil Mehta" },
-    { id: 2, name: "Ishita Reddy", admNo: "2024002", class: "8", section: "A", parent: "Mrs. Lakshmi Reddy" },
-    { id: 3, name: "Rohan Desai", admNo: "2024003", class: "10", section: "B", parent: "Mr. Amit Desai" },
-    { id: 4, name: "Priya Joshi", admNo: "2024004", class: "7", section: "C", parent: "Mrs. Sunita Joshi" },
-    { id: 5, name: "Arjun Kapoor", admNo: "2024005", class: "9", section: "A", parent: "Mr. Raj Kapoor" },
-    { id: 6, name: "Sneha Verma", admNo: "2024006", class: "6", section: "B", parent: "Mr. Vikram Verma" },
-    { id: 7, name: "Karan Shah", admNo: "2024007", class: "10", section: "A", parent: "Mrs. Meena Shah" },
-    { id: 8, name: "Ananya Iyer", admNo: "2024008", class: "5", section: "A", parent: "Mr. Ramesh Iyer" },
-];
 
 const StudentContext = createContext<StudentContextType | undefined>(undefined);
 
 export const StudentProvider = ({ children }: { children: ReactNode }) => {
-    const [students, setStudents] = useState<Student[]>(initialStudents);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { session } = useAuth();
 
-    const enrollStudent = (newStudent: Omit<Student, "id">) => {
-        const studentWithId = {
-            ...newStudent,
-            id: Math.max(0, ...students.map(s => s.id)) + 1,
-        };
-        setStudents((prev) => [studentWithId, ...prev]);
-    };
+  const fetchStudents = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("students")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    return (
-        <StudentContext.Provider value={{ students, enrollStudent }}>
-            {children}
-        </StudentContext.Provider>
-    );
+    if (error) {
+      console.warn("Error fetching students:", error.message);
+      setStudents([]);
+    } else {
+      setStudents(
+        (data || []).map((s: any) => ({
+          id: s.id,
+          name: s.name || "",
+          admNo: s.admission_no || "",
+          class: s.class_name || "",
+          section: s.section || "",
+          parent: s.parent_name || "",
+          email: s.parent_email || "",
+          phone: s.parent_phone || "",
+          dob: s.dob || "",
+          address: s.address || "",
+        }))
+      );
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (session) {
+      fetchStudents();
+    }
+  }, [session, fetchStudents]);
+
+  const enrollStudent = async (newStudent: NewStudent): Promise<{ error: string | null }> => {
+    const { data, error } = await supabase
+      .from("students")
+      .insert({
+        name: newStudent.name,
+        admission_no: newStudent.admNo || `ADM${Date.now().toString().slice(-6)}`,
+        class_name: newStudent.class,
+        section: newStudent.section,
+        parent_name: newStudent.parent,
+        parent_phone: newStudent.phone || null,
+        parent_email: newStudent.email || null,
+        dob: newStudent.dob || null,
+        address: newStudent.address || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error enrolling student:", error);
+      return { error: error.message };
+    }
+
+    if (data) {
+      setStudents((prev) => [
+        {
+          id: data.id,
+          name: data.name || "",
+          admNo: data.admission_no || "",
+          class: data.class_name || "",
+          section: data.section || "",
+          parent: data.parent_name || "",
+          email: data.parent_email || "",
+          phone: data.parent_phone || "",
+          dob: data.dob || "",
+          address: data.address || "",
+        },
+        ...prev,
+      ]);
+    }
+
+    return { error: null };
+  };
+
+  const deleteStudent = async (id: string) => {
+    const { error } = await supabase.from("students").delete().eq("id", id);
+    if (!error) {
+      setStudents((prev) => prev.filter((s) => s.id !== id));
+    }
+  };
+
+  return (
+    <StudentContext.Provider value={{ students, loading, enrollStudent, deleteStudent, refreshStudents: fetchStudents }}>
+      {children}
+    </StudentContext.Provider>
+  );
 };
 
 export const useStudents = () => {
-    const context = useContext(StudentContext);
-    if (context === undefined) {
-        throw new Error("useStudents must be used within a StudentProvider");
-    }
-    return context;
+  const context = useContext(StudentContext);
+  if (context === undefined) {
+    throw new Error("useStudents must be used within a StudentProvider");
+  }
+  return context;
 };

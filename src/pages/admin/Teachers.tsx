@@ -61,9 +61,9 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
 
   if (!open) return null;
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name || !phone || !subject) return;
-    addTeacher({
+    const { error } = await addTeacher({
       name,
       phone,
       email,
@@ -73,7 +73,9 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
       address,
       joiningDate
     });
-    setSubmitted(true);
+    if (!error) {
+      setSubmitted(true);
+    }
   };
 
   const handleClose = () => {
@@ -144,12 +146,12 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
 };
 
 const TeachersPage = () => {
-  const { teachers } = useTeachers();
+  const { teachers, loading } = useTeachers();
   const [search, setSearch] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
 
   const filtered = teachers.filter((t) =>
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    t.full_name.toLowerCase().includes(search.toLowerCase()) ||
     t.subjects.some(s => s.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -200,10 +202,10 @@ const TeachersPage = () => {
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
                             <AvatarFallback className="bg-accent text-xs text-accent-foreground">
-                              {teacher.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                              {teacher.full_name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-sm font-medium text-foreground">{teacher.name}</span>
+                          <span className="text-sm font-medium text-foreground">{teacher.full_name}</span>
                         </div>
                       </td>
                       <td className="hidden px-4 py-3 md:table-cell">

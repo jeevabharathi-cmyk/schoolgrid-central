@@ -19,6 +19,8 @@ import AccountSettings from "./pages/admin/AccountSettings";
 import TimetablePage from "./pages/admin/Timetable";
 import { StudentProvider } from "./context/StudentContext";
 import { TeacherProvider } from "./context/TeacherContext";
+import { ClassProvider } from "./context/ClassContext";
+import { AnnouncementProvider } from "./context/AnnouncementContext";
 import { AuthProvider } from "./context/AuthContext";
 import TeacherApp from "./pages/TeacherApp";
 import ParentApp from "./pages/ParentApp";
@@ -34,30 +36,34 @@ const App = () => (
       <AuthProvider>
         <StudentProvider>
           <TeacherProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Login />} />
-                <Route path="/signup" element={<SignUp />} />
-                <Route path="/admin" element={<AdminLayout />}>
-                  <Route index element={<AdminDashboard />} />
-                  <Route path="setup" element={<SchoolSetup />} />
-                  <Route path="classes" element={<ClassesPage />} />
-                  <Route path="subjects" element={<SubjectsPage />} />
-                  <Route path="teachers" element={<TeachersPage />} />
-                  <Route path="students" element={<StudentsPage />} />
-                  <Route path="assignments" element={<AssignmentsPage />} />
-                  <Route path="notifications" element={<NotificationsPage />} />
-                  <Route path="analytics" element={<AnalyticsPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="profile" element={<ViewProfile />} />
-                  <Route path="account-settings" element={<AccountSettings />} />
-                  <Route path="timetable" element={<TimetablePage />} />
-                </Route>
-                <Route path="/teacher" element={<TeacherApp />} />
-                <Route path="/parent" element={<ParentApp />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
+            <ClassProvider>
+              <AnnouncementProvider>
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Login />} />
+                    <Route path="/signup" element={<SignUp />} />
+                    <Route path="/admin" element={<AdminLayout />}>
+                      <Route index element={<AdminDashboard />} />
+                      <Route path="setup" element={<SchoolSetup />} />
+                      <Route path="classes" element={<ClassesPage />} />
+                      <Route path="subjects" element={<SubjectsPage />} />
+                      <Route path="teachers" element={<TeachersPage />} />
+                      <Route path="students" element={<StudentsPage />} />
+                      <Route path="assignments" element={<AssignmentsPage />} />
+                      <Route path="notifications" element={<NotificationsPage />} />
+                      <Route path="analytics" element={<AnalyticsPage />} />
+                      <Route path="settings" element={<SettingsPage />} />
+                      <Route path="profile" element={<ViewProfile />} />
+                      <Route path="account-settings" element={<AccountSettings />} />
+                      <Route path="timetable" element={<TimetablePage />} />
+                    </Route>
+                    <Route path="/teacher" element={<TeacherApp />} />
+                    <Route path="/parent" element={<ParentApp />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </BrowserRouter>
+              </AnnouncementProvider>
+            </ClassProvider>
           </TeacherProvider>
         </StudentProvider>
       </AuthProvider>

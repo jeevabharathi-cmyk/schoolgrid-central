@@ -1,25 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Edit, Trash2, ChevronRight, Grid3X3, X, BookOpen,
-  CheckCircle2, AlertTriangle
+  CheckCircle2, AlertTriangle, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-type ClassItem = { id: number; name: string; sections: string[] };
-
-// ─── Initial Data ─────────────────────────────────────────────────────────────
-const initialData: ClassItem[] = [
-  { id: 1, name: "Class 5", sections: ["A", "B"] },
-  { id: 2, name: "Class 6", sections: ["A", "B"] },
-  { id: 3, name: "Class 7", sections: ["A", "B", "C"] },
-  { id: 4, name: "Class 8", sections: ["A", "B"] },
-  { id: 5, name: "Class 9", sections: ["A", "B"] },
-  { id: 6, name: "Class 10", sections: ["A", "B"] },
-];
+import { useClasses, ClassItem, Section } from "@/context/ClassContext";
 
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
 const Modal = ({
@@ -85,14 +73,14 @@ const Field = ({
 
 // ─── Classes Page ─────────────────────────────────────────────────────────────
 const ClassesPage = () => {
-  const [classes, setClasses] = useState<ClassItem[]>(initialData);
-  const [selected, setSelected] = useState<number>(1);
+  const { classes, loading, addClass, addSection, updateSection, deleteSection } = useClasses();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Modal states
   const [addClassOpen, setAddClassOpen] = useState(false);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
-  const [editSection, setEditSection] = useState<string | null>(null);    // section letter being edited
-  const [deleteSection, setDeleteSection] = useState<string | null>(null); // section letter to delete
+  const [editSectionObj, setEditSectionObj] = useState<Section | null>(null);    
+  const [deleteSectionObj, setDeleteSectionObj] = useState<Section | null>(null); 
 
   // Form values
   const [newClassName, setNewClassName] = useState("");
@@ -104,51 +92,50 @@ const ClassesPage = () => {
   const [addClassSuccess, setAddClassSuccess] = useState(false);
   const [addSectionSuccess, setAddSectionSuccess] = useState(false);
 
-  const selectedClass = classes.find((c) => c.id === selected);
+  const selectedClass = classes.find((c) => c.id === selectedId);
+
+  // Set default selection when loading finishes
+  useEffect(() => {
+    if (!loading && classes.length > 0 && !selectedId) {
+      setSelectedId(classes[0].id);
+    }
+  }, [loading, classes, selectedId]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleAddClass = () => {
+  const handleAddClass = async () => {
     if (!newClassName.trim()) return;
-    const newId = Math.max(...classes.map((c) => c.id)) + 1;
-    setClasses((prev) => [...prev, { id: newId, name: newClassName.trim(), sections: [] }]);
-    setSelected(newId);
-    setAddClassSuccess(true);
+    const { data, error } = await addClass(newClassName.trim(), parseInt(newClassNum) || 0);
+    if (!error && data) {
+      setSelectedId(data.id);
+      setAddClassSuccess(true);
+    }
   };
 
-  const handleAddSection = () => {
-    if (!newSectionName.trim() || !selectedClass) return;
+  const handleAddSection = async () => {
+    if (!newSectionName.trim() || !selectedId) return;
     const letter = newSectionName.trim().toUpperCase();
-    if (selectedClass.sections.includes(letter)) return;
-    setClasses((prev) =>
-      prev.map((c) => c.id === selected ? { ...c, sections: [...c.sections, letter] } : c)
-    );
-    setAddSectionSuccess(true);
+    const { error } = await addSection(selectedId, letter);
+    if (!error) {
+      setAddSectionSuccess(true);
+    }
   };
 
-  const handleSaveEditSection = () => {
-    if (!editSectionName.trim() || !selectedClass || !editSection) return;
-    const newLetter = editSectionName.trim().toUpperCase();
-    setClasses((prev) =>
-      prev.map((c) =>
-        c.id === selected
-          ? { ...c, sections: c.sections.map((s) => (s === editSection ? newLetter : s)) }
-          : c
-      )
-    );
-    setEditSection(null);
-    setEditSectionName("");
+  const handleSaveEditSection = async () => {
+    if (!editSectionName.trim() || !editSectionObj) return;
+    const newName = editSectionName.trim().toUpperCase();
+    const { error } = await updateSection(editSectionObj.id, newName);
+    if (!error) {
+      setEditSectionObj(null);
+      setEditSectionName("");
+    }
   };
 
-  const handleDeleteSection = () => {
-    if (!deleteSection || !selectedClass) return;
-    setClasses((prev) =>
-      prev.map((c) =>
-        c.id === selected
-          ? { ...c, sections: c.sections.filter((s) => s !== deleteSection) }
-          : c
-      )
-    );
-    setDeleteSection(null);
+  const handleDeleteSection = async () => {
+    if (!deleteSectionObj) return;
+    const { error } = await deleteSection(deleteSectionObj.id);
+    if (!error) {
+      setDeleteSectionObj(null);
+    }
   };
 
   const closeAddClass = () => { setAddClassOpen(false); setNewClassName(""); setNewClassNum(""); setAddClassSuccess(false); };
@@ -174,33 +161,42 @@ const ClassesPage = () => {
               <CardTitle className="text-sm font-semibold">Classes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 p-3 pt-0">
-              <AnimatePresence initial={false}>
-                {classes.map((cls) => (
-                  <motion.button
-                    key={cls.id}
-                    layout
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -8 }}
-                    onClick={() => setSelected(cls.id)}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors ${selected === cls.id
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground hover:bg-secondary"
-                      }`}
-                  >
-                    <span className="font-medium">{cls.name}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={selected === cls.id ? "outline" : "secondary"}
-                        className={`text-xs ${selected === cls.id ? "border-primary-foreground/30 text-primary-foreground" : ""}`}
-                      >
-                        {cls.sections.length} sections
-                      </Badge>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
-                    </div>
-                  </motion.button>
-                ))}
-              </AnimatePresence>
+              {loading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <AnimatePresence initial={false}>
+                  {classes.map((cls) => (
+                    <motion.button
+                      key={cls.id}
+                      layout
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -8 }}
+                      onClick={() => setSelectedId(cls.id)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors ${selectedId === cls.id
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-secondary"
+                        }`}
+                    >
+                      <span className="font-medium">{cls.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={selectedId === cls.id ? "outline" : "secondary"}
+                          className={`text-xs ${selectedId === cls.id ? "border-primary-foreground/30 text-primary-foreground" : ""}`}
+                        >
+                          {cls.sections.length} sections
+                        </Badge>
+                        <ChevronRight className="h-4 w-4 opacity-50" />
+                      </div>
+                    </motion.button>
+                  ))}
+                  {classes.length === 0 && (
+                    <p className="py-4 text-center text-xs text-muted-foreground">No classes found.</p>
+                  )}
+                </AnimatePresence>
+              )}
             </CardContent>
           </Card>
 
@@ -231,7 +227,7 @@ const ClassesPage = () => {
                     <AnimatePresence initial={false}>
                       {selectedClass.sections.map((section) => (
                         <motion.div
-                          key={section}
+                          key={section.id}
                           layout
                           initial={{ opacity: 0, scale: 0.92 }}
                           animate={{ opacity: 1, scale: 1 }}
@@ -240,22 +236,22 @@ const ClassesPage = () => {
                         >
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-sm">
-                              {section}
+                              {section.name}
                             </div>
                             <div>
-                              <p className="font-semibold text-sm text-foreground">Section {section}</p>
-                              <p className="text-xs text-muted-foreground">{selectedClass.name} — {section}</p>
+                              <p className="font-semibold text-sm text-foreground">Section {section.name}</p>
+                              <p className="text-xs text-muted-foreground">{selectedClass.name} — {section.name}</p>
                             </div>
                           </div>
                           <div className="flex gap-1">
                             <button
-                              onClick={() => { setEditSection(section); setEditSectionName(section); }}
+                              onClick={() => { setEditSectionObj(section); setEditSectionName(section.name); }}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-primary transition-colors"
                             >
                               <Edit className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              onClick={() => setDeleteSection(section)}
+                              onClick={() => setDeleteSectionObj(section)}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -267,7 +263,7 @@ const ClassesPage = () => {
                   </div>
                 )
               ) : (
-                <p className="text-sm text-muted-foreground">Select a class from the left panel to manage its sections.</p>
+                <p className="text-sm text-muted-foreground text-center py-20">Select a class from the left panel to manage its sections.</p>
               )}
             </CardContent>
           </Card>
@@ -355,8 +351,8 @@ const ClassesPage = () => {
                 <p className="mb-2 text-xs text-muted-foreground">Existing sections:</p>
                 <div className="flex flex-wrap gap-2">
                   {selectedClass.sections.map((s) => (
-                    <span key={s} className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                      {s}
+                    <span key={s.id} className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                      {s.name}
                     </span>
                   ))}
                 </div>
@@ -378,8 +374,8 @@ const ClassesPage = () => {
 
       {/* ── Edit Section Modal ───────────────────────────────────────────── */}
       <Modal
-        open={editSection !== null}
-        onClose={() => { setEditSection(null); setEditSectionName(""); }}
+        open={editSectionObj !== null}
+        onClose={() => { setEditSectionObj(null); setEditSectionName(""); }}
         title="Edit Section"
         subtitle={`Rename section in ${selectedClass?.name}`}
         icon={Edit}
@@ -387,7 +383,7 @@ const ClassesPage = () => {
         <div className="px-6 pb-6 pt-4 space-y-4">
           <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
             <p className="text-xs text-muted-foreground">Editing</p>
-            <p className="text-sm font-semibold text-primary">{selectedClass?.name} — Section {editSection}</p>
+            <p className="text-sm font-semibold text-primary">{selectedClass?.name} — Section {editSectionObj?.name}</p>
           </div>
           <Field
             label="New Section Name *"
@@ -397,7 +393,7 @@ const ClassesPage = () => {
             hint="Enter the new section letter or name"
           />
           <div className="flex gap-3 pt-1">
-            <Button variant="outline" className="flex-1" onClick={() => { setEditSection(null); setEditSectionName(""); }}>
+            <Button variant="outline" className="flex-1" onClick={() => { setEditSectionObj(null); setEditSectionName(""); }}>
               Cancel
             </Button>
             <Button
@@ -413,8 +409,8 @@ const ClassesPage = () => {
 
       {/* ── Delete Section Confirm Modal ─────────────────────────────────── */}
       <Modal
-        open={deleteSection !== null}
-        onClose={() => setDeleteSection(null)}
+        open={deleteSectionObj !== null}
+        onClose={() => setDeleteSectionObj(null)}
         title="Delete Section"
         subtitle="This action cannot be undone"
         icon={AlertTriangle}
@@ -424,7 +420,7 @@ const ClassesPage = () => {
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
             <p className="text-sm text-foreground">
               Are you sure you want to delete{" "}
-              <strong className="text-destructive">Section {deleteSection}</strong> from{" "}
+              <strong className="text-destructive">Section {deleteSectionObj?.name}</strong> from{" "}
               <strong>{selectedClass?.name}</strong>?
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -432,7 +428,7 @@ const ClassesPage = () => {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setDeleteSection(null)}>
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteSectionObj(null)}>
               Cancel
             </Button>
             <Button

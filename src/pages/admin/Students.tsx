@@ -64,9 +64,9 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
 
   if (!open) return null;
 
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (!name || !studentClass || !section || !parentName || !parentPhone) return;
-    enrollStudent({
+    const { error } = await enrollStudent({
       name,
       admNo: admNo || `ADM${Date.now().toString().slice(-6)}`,
       class: studentClass,
@@ -77,7 +77,9 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
       dob,
       address
     });
-    setSubmitted(true);
+    if (!error) {
+      setSubmitted(true);
+    }
   };
 
   const handleClose = () => {
@@ -154,7 +156,7 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
 };
 
 const StudentsPage = () => {
-  const { students } = useStudents();
+  const { students, loading } = useStudents();
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("all");
   const [addModalOpen, setAddModalOpen] = useState(false);
