@@ -1,0 +1,71 @@
+# Structural Analysis: Existing App vs. Supabase Backend
+
+This document compares the current local state management in the React and Flutter applications with the proposed Supabase backend schema for SchoolGrid Central.
+
+## 📊 Structure Comparison
+
+### 1. Data Models (Local vs. Supabase)
+
+| Feature | Current Local Structure (React/Flutter) | Proposed Supabase Schema | Difference / Change |
+| :--- | :--- | :--- | :--- |
+| **User Identity** | Roles (Teacher/Parent) handled by session logic. | `PROFILES` table (uuid, role, name, phone). | Centralized user management with UUID-based Auth. |
+| **Homework** | [Homework](file:///c:/Users/jeeva%20bharathi/OneDrive/Desktop/flutter_mobile%20app/flutter_app/lib/core/models/homework_models.dart#104-146) object with nested `doubts` and `acknowledgments`. | `HOMEWORK` table + relational joins. | Moving from a nested document-style structure to a normalized relational schema. |
+| **Doubts** | [Doubt](file:///c:/Users/jeeva%20bharathi/OneDrive/Desktop/schoolgrid-central/src/doubtStore.ts#8-20) object with nested [reply](file:///c:/Users/jeeva%20bharathi/OneDrive/Desktop/schoolgrid-central/src/doubtStore.ts#124-142). | `DOUBTS` and `DOUBT_REPLIES` tables. | Decoupling questions and replies into separate linked tables for better query performance. |
+| **Students** | Identified by names and "application number". | `STUDENTS` table (linked to Parent UUID). | Formalizing child-parent relationships in the DB instead of dynamic in-memory lookups. |
+| **Real-time** | Manual `notifyListeners()` in Flutter and [subscribe](file:///c:/Users/jeeva%20bharathi/OneDrive/Desktop/schoolgrid-central/src/doubtStore.ts#48-55) in React. | Supabase `Realtime` streams and RLS. | Moving from manual UI-managed updates to DB-level real-time synchronization. |
+
+---
+
+## 🛠 Combined Architecture (The "Desired App")
+
+To "combine" these structures, the application will shift from local-first management to a **Remote-Synchronized Integration**.
+
+### Unified Data Flow
+1. **Source of Truth**: Supabase PostgreSQL database.
+2. **Access Layer**: `SupabaseClient` replacing the [HomeworkService](file:///c:/Users/jeeva%20bharathi/OneDrive/Desktop/flutter_mobile%20app/flutter_app/lib/core/services/homework_service.dart#5-160) in-memory logic.
+3. **Reactive UI**: Flutter `StreamBuilder` or `future` states replacing manual local notification stores.
+
+### Integration Mapping
+
+```mermaid
+graph TD
+    subgraph "Flutter/React (Frontend)"
+        F_Auth[Auth Service]
+        F_HW[Homework UI]
+        F_DBT[Doubt UI]
+    end
+
+    subgraph "Supabase (Backend)"
+        S_Auth[Supabase Auth]
+        S_Tab1[public.profiles]
+        S_Tab2[public.homework]
+        S_Tab3[public.doubts]
+        S_Tab4[public.acknowledgments]
+        S_RLS[Row Level Security]
+    end
+
+    F_Auth -->|Sign In/Up| S_Auth
+    S_Auth -->|Sync| S_Tab1
+    F_HW -->|Query Homework| S_Tab2
+    F_HW -->|Acknowledge| S_Tab4
+    F_DBT -->|Ask/Reply| S_Tab3
+    S_RLS -.->|Secures| S_Tab1
+    S_RLS -.->|Secures| S_Tab2
+    S_RLS -.->|Secures| S_Tab3
+```
+
+---
+
+## 🚀 Transition Strategy
+
+### Phase 1: Authentication Migration
+- Replace [authStore.ts](file:///c:/Users/jeeva%20bharathi/OneDrive/Desktop/schoolgrid-central/src/authStore.ts) (React) and `AuthService` (Flutter) with `supabase.auth`.
+- On first login, upsert the user profile into the `PROFILES` table.
+
+### Phase 2: Homework & Doubts Relational Mapping
+- When posting homework, instead of adding to a local list, perform a `supabase.from('homework').insert()`.
+- Fetch doubts by joining `DOUBTS` and `DOUBT_REPLIES` for a specific `homework_id`.
+
+### Phase 3: Real-time Sync
+- Enable real-time updates for the `doubts` and `acknowledgments` tables.
+- This ensures teachers see new doubts and parents see replies without manual refresh.
