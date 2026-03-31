@@ -29,32 +29,6 @@ const PERIODS = [
     { no: 8, time: "2:15 – 3:00" },
 ] as const;
 
-const SUBJECTS = [
-    "Mathematics", "Science", "English", "Hindi", "Social Science",
-    "Physical Education", "Computer Science", "Art & Craft", "Music", "Library"
-];
-
-const TEACHERS = [
-    { id: 1, name: "Mrs. Anita Sharma", subject: "Mathematics" },
-    { id: 2, name: "Mr. Rajesh Patel", subject: "Science" },
-    { id: 3, name: "Mrs. Priya Kumar", subject: "English" },
-    { id: 4, name: "Mr. Suresh Gupta", subject: "Hindi" },
-    { id: 5, name: "Mrs. Deepa Nair", subject: "Social Science" },
-    { id: 6, name: "Mr. Vikram Singh", subject: "Physical Education" },
-    { id: 7, name: "Mrs. Kavya Iyer", subject: "Computer Science" },
-    { id: 8, name: "Mr. Arun Ravi", subject: "Art & Craft" },
-];
-
-const CLASSES = ["Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10"];
-const SECTIONS: Record<string, string[]> = {
-    "Class 5": ["A", "B"],
-    "Class 6": ["A", "B"],
-    "Class 7": ["A", "B", "C"],
-    "Class 8": ["A", "B"],
-    "Class 9": ["A", "B"],
-    "Class 10": ["A", "B"],
-};
-
 // Subject → color mapping
 const SUBJECT_COLORS: Record<string, string> = {
     "Mathematics": "bg-blue-100 text-blue-800 border-blue-200",
@@ -67,91 +41,50 @@ const SUBJECT_COLORS: Record<string, string> = {
     "Art & Craft": "bg-pink-100 text-pink-800 border-pink-200",
     "Music": "bg-indigo-100 text-indigo-800 border-indigo-200",
     "Library": "bg-teal-100 text-teal-800 border-teal-200",
+    "Social": "bg-yellow-100 text-yellow-800 border-yellow-200",
 };
 
-// ─── Seed timetable for Class 5 / Section A ──────────────────────────────────
+type Subject = {
+    id: string;
+    name: string;
+};
+
 type SlotKey = string; // "dayIndex-periodNo"
-type Slot = { subject: string; teacherId: number };
-
-const seedTimetable = (): Record<SlotKey, Slot> => ({
-    "0-1": { subject: "Mathematics", teacherId: 1 },
-    "0-2": { subject: "English", teacherId: 3 },
-    "0-3": { subject: "Science", teacherId: 2 },
-    "0-4": { subject: "Hindi", teacherId: 4 },
-    "0-5": { subject: "Social Science", teacherId: 5 },
-    "0-6": { subject: "Physical Education", teacherId: 6 },
-    "0-7": { subject: "Computer Science", teacherId: 7 },
-    "0-8": { subject: "Art & Craft", teacherId: 8 },
-
-    "1-1": { subject: "English", teacherId: 3 },
-    "1-2": { subject: "Mathematics", teacherId: 1 },
-    "1-3": { subject: "Hindi", teacherId: 4 },
-    "1-4": { subject: "Science", teacherId: 2 },
-    "1-5": { subject: "Art & Craft", teacherId: 8 },
-    "1-6": { subject: "Mathematics", teacherId: 1 },
-    "1-7": { subject: "Social Science", teacherId: 5 },
-    "1-8": { subject: "English", teacherId: 3 },
-
-    "2-1": { subject: "Science", teacherId: 2 },
-    "2-2": { subject: "Social Science", teacherId: 5 },
-    "2-3": { subject: "Mathematics", teacherId: 1 },
-    "2-4": { subject: "English", teacherId: 3 },
-    "2-5": { subject: "Hindi", teacherId: 4 },
-    "2-6": { subject: "Physical Education", teacherId: 6 },
-    "2-7": { subject: "Computer Science", teacherId: 7 },
-    "2-8": { subject: "Science", teacherId: 2 },
-
-    "3-1": { subject: "Hindi", teacherId: 4 },
-    "3-2": { subject: "Computer Science", teacherId: 7 },
-    "3-3": { subject: "Social Science", teacherId: 5 },
-    "3-4": { subject: "Mathematics", teacherId: 1 },
-    "3-5": { subject: "Science", teacherId: 2 },
-    "3-6": { subject: "English", teacherId: 3 },
-    "3-7": { subject: "Hindi", teacherId: 4 },
-    "3-8": { subject: "Mathematics", teacherId: 1 },
-
-    "4-1": { subject: "Social Science", teacherId: 5 },
-    "4-2": { subject: "Science", teacherId: 2 },
-    "4-3": { subject: "English", teacherId: 3 },
-    "4-4": { subject: "Art & Craft", teacherId: 8 },
-    "4-5": { subject: "Mathematics", teacherId: 1 },
-    "4-6": { subject: "Hindi", teacherId: 4 },
-    "4-7": { subject: "Physical Education", teacherId: 6 },
-    "4-8": { subject: "Social Science", teacherId: 5 },
-
-    "5-1": { subject: "Physical Education", teacherId: 6 },
-    "5-2": { subject: "Art & Craft", teacherId: 8 },
-    "5-3": { subject: "Computer Science", teacherId: 7 },
-    "5-4": { subject: "Science", teacherId: 2 },
-    "5-5": { subject: "English", teacherId: 3 },
-    "5-6": { subject: "Mathematics", teacherId: 1 },
-    "5-7": { subject: "Hindi", teacherId: 4 },
-    "5-8": { subject: "Computer Science", teacherId: 7 },
-});
+type Slot = { subjectId: string; teacherId: string };
 
 // ─── Period Edit Modal ────────────────────────────────────────────────────────
 const EditPeriodModal = ({
-    open, onClose, day, period, time, currentSlot, onSave,
+    open, onClose, day, period, time, currentSlot, onSave, subjects, teachers,
 }: {
     open: boolean; onClose: () => void; day: string; period: number; time: string;
     currentSlot: Slot | null;
     onSave: (slot: Slot) => void;
+    subjects: Subject[];
+    teachers: Teacher[];
 }) => {
-    const [subject, setSubject] = useState(currentSlot?.subject ?? "");
-    const [teacherId, setTeacherId] = useState(currentSlot?.teacherId ?? 0);
+    const [subjectId, setSubjectId] = useState(currentSlot?.subjectId ?? "");
+    const [teacherId, setTeacherId] = useState(currentSlot?.teacherId ?? "");
     const [saved, setSaved] = useState(false);
 
-    const filteredTeachers = subject
-        ? TEACHERS.filter((t) => t.subject === subject || true) // show all, highlight matching
-        : TEACHERS;
+    const selectedSubject = subjects.find(s => s.id === subjectId);
+    const selectedTeacher = teachers.find(t => t.id === teacherId);
+
+    const filteredTeachers = subjectId && selectedSubject
+        ? teachers.filter((t) => t.subjects.includes(selectedSubject.name) || true) // show all, highlight matching
+        : teachers;
 
     const handleSave = () => {
-        if (!subject || !teacherId) return;
-        onSave({ subject, teacherId });
+        if (!subjectId || !teacherId) return;
+        onSave({ subjectId, teacherId });
         setSaved(true);
     };
 
-    const handleClose = () => { setSaved(false); setSubject(currentSlot?.subject ?? ""); setTeacherId(currentSlot?.teacherId ?? 0); onClose(); };
+    const handleClose = () => {
+        setSaved(false);
+        setSubjectId(currentSlot?.subjectId ?? "");
+        setTeacherId(currentSlot?.teacherId ?? "");
+        onClose();
+    };
 
     if (!open) return null;
     return (
@@ -201,16 +134,16 @@ const EditPeriodModal = ({
                         <div>
                             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Subject *</label>
                             <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
-                                {SUBJECTS.map((s) => (
+                                {subjects.map((s) => (
                                     <button
-                                        key={s}
-                                        onClick={() => setSubject(s)}
-                                        className={`rounded-lg border px-3 py-2 text-xs font-medium text-left transition-all ${subject === s
+                                        key={s.id}
+                                        onClick={() => setSubjectId(s.id)}
+                                        className={`rounded-lg border px-3 py-2 text-xs font-medium text-left transition-all ${subjectId === s.id
                                             ? "border-primary bg-primary/8 text-primary ring-1 ring-primary/30"
                                             : "border-border bg-secondary/30 text-foreground hover:bg-secondary"
                                             }`}
                                     >
-                                        {s}
+                                        {s.name}
                                     </button>
                                 ))}
                             </div>
@@ -231,13 +164,13 @@ const EditPeriodModal = ({
                                     >
                                         <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${teacherId === t.id ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"
                                             }`}>
-                                            {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                                            {t.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                                         </div>
                                         <div className="min-w-0">
-                                            <p className={`text-xs font-semibold truncate ${teacherId === t.id ? "text-primary" : "text-foreground"}`}>{t.name}</p>
-                                            <p className="text-[10px] text-muted-foreground">{t.subject}</p>
+                                            <p className={`text-xs font-semibold truncate ${teacherId === t.id ? "text-primary" : "text-foreground"}`}>{t.full_name}</p>
+                                            <p className="text-[10px] text-muted-foreground">{t.subjects.join(", ")}</p>
                                         </div>
-                                        {t.subject === subject && (
+                                        {t.subjects.includes(selectedSubject?.name || "") && (
                                             <span className="ml-auto shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">Match</span>
                                         )}
                                     </button>
@@ -249,13 +182,25 @@ const EditPeriodModal = ({
                         <div className="flex gap-3 pt-1">
                             <Button variant="outline" className="flex-1" onClick={handleClose}>Cancel</Button>
                             <Button
-                                className={`flex-1 text-primary-foreground ${subject && teacherId ? "bg-primary hover:bg-primary/90" : "bg-muted text-muted-foreground cursor-not-allowed"}`}
+                                className={`flex-1 text-primary-foreground ${subjectId && teacherId ? "bg-primary hover:bg-primary/90" : "bg-muted text-muted-foreground cursor-not-allowed"}`}
                                 onClick={handleSave}
-                                disabled={!subject || !teacherId}
+                                disabled={!subjectId || !teacherId}
                             >
                                 Save Period
                             </Button>
                         </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600">
+                            <CheckCircle2 className="h-7 w-7" />
+                        </div>
+                        <h3 className="text-base font-bold text-foreground">Period Saved!</h3>
+                        <p className="text-sm text-muted-foreground">
+                            <strong>{selectedSubject?.name}</strong> assigned to{" "}
+                            <strong>{selectedTeacher?.full_name}</strong>.
+                        </p>
+                        <Button className="mt-2 bg-primary text-primary-foreground" onClick={handleClose}>Done</Button>
                     </div>
                 )}
             </motion.div>
@@ -299,49 +244,130 @@ const ClearPeriodModal = ({ open, onClose, onConfirm, day, period }: {
 
 // ─── Timetable Page ───────────────────────────────────────────────────────────
 const TimetablePage = () => {
-    const [selectedClass, setSelectedClass] = useState("Class 5");
-    const [selectedSection, setSelectedSection] = useState("A");
+    const { classes, loading: classesLoading } = useClasses();
+    const { teachers, loading: teachersLoading } = useTeachers();
+    const [subjects, setSubjects] = useState<Subject[]>([]);
+    const [timetable, setTimetable] = useState<Record<SlotKey, Slot>>({});
+    const [loading, setLoading] = useState(true);
 
-    // Dynamically pre-populate templates for all classes and sections
-    const [timetables, setTimetables] = useState<Record<string, Record<SlotKey, Slot>>>(() => {
-        const initial: Record<string, Record<SlotKey, Slot>> = {};
-        Object.entries(SECTIONS).forEach(([className, sections]) => {
-            sections.forEach(section => {
-                initial[`${className}-${section}`] = seedTimetable();
-            });
-        });
-        return initial;
-    });
+    const [selectedClassId, setSelectedClassId] = useState<string>("");
+    const [selectedSectionId, setSelectedSectionId] = useState<string>("");
 
     const [editModal, setEditModal] = useState<{ day: number; period: number } | null>(null);
     const [clearModal, setClearModal] = useState<{ day: number; period: number } | null>(null);
 
-    const tableKey = `${selectedClass}-${selectedSection}`;
-    const timetable = timetables[tableKey] ?? {};
-    const hasTimetable = Object.keys(timetable).length > 0;
+    const selectedClass = classes.find(c => c.id === selectedClassId);
+    const selectedSection = selectedClass?.sections.find(s => s.id === selectedSectionId);
+
+    // Initial selection
+    useEffect(() => {
+        if (!classesLoading && classes.length > 0 && !selectedClassId) {
+            setSelectedClassId(classes[0].id);
+            if (classes[0].sections.length > 0) {
+                setSelectedSectionId(classes[0].sections[0].id);
+            }
+        }
+    }, [classesLoading, classes, selectedClassId]);
+
+    // Fetch subjects
+    useEffect(() => {
+        const fetchSubjects = async () => {
+            const { data, error } = await supabase.from("subjects").select("id, name");
+            if (error) {
+                console.error("Error fetching subjects:", error);
+            } else {
+                setSubjects(data || []);
+            }
+        };
+        fetchSubjects();
+    }, []);
+
+    // Fetch timetable
+    const fetchTimetable = useCallback(async () => {
+        if (!selectedClassId || !selectedSectionId) return;
+        setLoading(true);
+        const { data, error } = await supabase
+            .from("timetable")
+            .select("*")
+            .eq("class_id", selectedClassId)
+            .eq("section_id", selectedSectionId);
+
+        if (error) {
+            console.error("Error fetching timetable:", error);
+            toast.error("Failed to load timetable");
+        } else {
+            const formatted: Record<SlotKey, Slot> = {};
+            (data || []).forEach((row: any) => {
+                formatted[`${row.day_index}-${row.period_no}`] = {
+                    subjectId: row.subject_id,
+                    teacherId: row.teacher_id
+                };
+            });
+            setTimetable(formatted);
+        }
+        setLoading(false);
+    }, [selectedClassId, selectedSectionId]);
+
+    useEffect(() => {
+        fetchTimetable();
+    }, [fetchTimetable]);
 
     const getSlot = (dayIndex: number, periodNo: number): Slot | null =>
         timetable[`${dayIndex}-${periodNo}`] ?? null;
 
-    const saveSlot = (dayIndex: number, periodNo: number, slot: Slot) => {
-        setTimetables((prev) => ({
-            ...prev,
-            [tableKey]: { ...prev[tableKey], [`${dayIndex}-${periodNo}`]: slot },
-        }));
-        setEditModal(null);
+    const saveSlot = async (dayIndex: number, periodNo: number, slot: Slot) => {
+        if (!selectedClassId || !selectedSectionId) return;
+
+        const { error } = await supabase
+            .from("timetable")
+            .upsert({
+                class_id: selectedClassId,
+                section_id: selectedSectionId,
+                day_index: dayIndex,
+                period_no: periodNo,
+                subject_id: slot.subjectId,
+                teacher_id: slot.teacherId,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: "class_id,section_id,day_index,period_no"
+            });
+
+        if (error) {
+            console.error("Error saving slot:", error);
+            toast.error("Failed to save period");
+        } else {
+            setTimetable((prev) => ({
+                ...prev,
+                [`${dayIndex}-${periodNo}`]: slot,
+            }));
+            setEditModal(null);
+            toast.success("Period updated");
+        }
     };
 
-    const clearSlot = (dayIndex: number, periodNo: number) => {
-        setTimetables((prev) => {
-            const updated = { ...prev[tableKey] };
-            delete updated[`${dayIndex}-${periodNo}`];
-            return { ...prev, [tableKey]: updated };
-        });
-        setClearModal(null);
-    };
+    const clearSlot = async (dayIndex: number, periodNo: number) => {
+        if (!selectedClassId || !selectedSectionId) return;
 
-    const createBlankTimetable = () => {
-        setTimetables((prev) => ({ ...prev, [tableKey]: {} }));
+        const { error } = await supabase
+            .from("timetable")
+            .delete()
+            .eq("class_id", selectedClassId)
+            .eq("section_id", selectedSectionId)
+            .eq("day_index", dayIndex)
+            .eq("period_no", periodNo);
+
+        if (error) {
+            console.error("Error clearing slot:", error);
+            toast.error("Failed to clear period");
+        } else {
+            setTimetable((prev) => {
+                const updated = { ...prev };
+                delete updated[`${dayIndex}-${periodNo}`];
+                return updated;
+            });
+            setClearModal(null);
+            toast.success("Period cleared");
+        }
     };
 
     const workingPeriods = PERIODS.filter((p) => !("isBreak" in p && p.isBreak));
@@ -372,34 +398,43 @@ const TimetablePage = () => {
                         <BookOpen className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium text-muted-foreground">Class:</span>
                         <div className="flex flex-wrap gap-1.5">
-                            {CLASSES.map((cls) => (
-                                <button
-                                    key={cls}
-                                    onClick={() => { setSelectedClass(cls); setSelectedSection(SECTIONS[cls][0]); }}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${selectedClass === cls
-                                        ? "bg-primary text-primary-foreground shadow-sm"
-                                        : "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
-                                        }`}
-                                >
-                                    {cls}
-                                </button>
-                            ))}
+                            {classesLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            ) : (
+                                classes.map((cls) => (
+                                    <button
+                                        key={cls.id}
+                                        onClick={() => {
+                                            setSelectedClassId(cls.id);
+                                            if (cls.sections.length > 0) {
+                                                setSelectedSectionId(cls.sections[0].id);
+                                            }
+                                        }}
+                                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${selectedClassId === cls.id
+                                            ? "bg-primary text-primary-foreground shadow-sm"
+                                            : "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
+                                            }`}
+                                    >
+                                        {cls.name}
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium text-muted-foreground">Section:</span>
                         <div className="flex gap-1.5">
-                            {(SECTIONS[selectedClass] ?? []).map((sec) => (
+                            {(selectedClass?.sections ?? []).map((sec) => (
                                 <button
-                                    key={sec}
-                                    onClick={() => setSelectedSection(sec)}
-                                    className={`h-8 w-8 rounded-lg text-xs font-bold transition-all ${selectedSection === sec
+                                    key={sec.id}
+                                    onClick={() => setSelectedSectionId(sec.id)}
+                                    className={`h-8 w-8 rounded-lg text-xs font-bold transition-all ${selectedSectionId === sec.id
                                         ? "bg-primary text-primary-foreground"
                                         : "bg-secondary text-muted-foreground hover:bg-accent"
                                         }`}
                                 >
-                                    {sec}
+                                    {sec.name}
                                 </button>
                             ))}
                         </div>
@@ -407,45 +442,34 @@ const TimetablePage = () => {
                 </div>
 
                 {/* Stats bar */}
-                {hasTimetable && (
-                    <div className="flex flex-wrap gap-3">
-                        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-                            <Calendar className="h-4 w-4 text-primary" />
-                            <span className="text-xs font-medium text-foreground">{selectedClass} – Section {selectedSection}</span>
-                        </div>
-                        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-                            <Clock className="h-4 w-4 text-primary" />
-                            <span className="text-xs font-medium text-foreground">{filledSlots} / {totalSlots} periods filled</span>
-                        </div>
-                        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-                            <div className="relative h-4 w-20 overflow-hidden rounded-full bg-secondary">
-                                <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all" style={{ width: `${completionPct}%` }} />
-                            </div>
-                            <span className="text-xs font-medium text-foreground">{completionPct}% complete</span>
-                        </div>
+                <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-medium text-foreground">
+                            {selectedClass?.name ?? "..."} – Section {selectedSection?.name ?? "..."}
+                        </span>
                     </div>
-                )}
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-medium text-foreground">{filledSlots} / {totalSlots} periods filled</span>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                        <div className="relative h-4 w-20 overflow-hidden rounded-full bg-secondary">
+                            <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all" style={{ width: `${completionPct}%` }} />
+                        </div>
+                        <span className="text-xs font-medium text-foreground">{completionPct}% complete</span>
+                    </div>
+                </div>
 
-                {/* No timetable state */}
-                {!hasTimetable ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                                <Calendar className="h-8 w-8 text-primary" />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-bold text-foreground">No timetable yet</h3>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    {selectedClass} – Section {selectedSection} doesn't have a timetable. Create one to get started.
-                                </p>
-                            </div>
-                            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={createBlankTimetable}>
-                                <Plus className="mr-2 h-4 w-4" /> Create Timetable
-                            </Button>
+                {/* Timetable Grid */}
+                {loading ? (
+                    <Card className="py-16">
+                        <CardContent className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">Loading timetable...</p>
                         </CardContent>
                     </Card>
                 ) : (
-                    /* Timetable Grid */
                     <Card className="overflow-hidden">
                         <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-3">
                             <CardTitle className="text-sm font-semibold">
