@@ -32,7 +32,8 @@ interface TeacherContextType {
   teachers: Teacher[];
   loading: boolean;
   addTeacher: (teacher: NewTeacher) => Promise<{ error: string | null }>;
-  deleteTeacher: (id: string) => Promise<void>;
+  updateTeacher: (id: string, teacher: Partial<Teacher>) => Promise<{ error: string | null }>;
+  deleteTeacher: (id: string) => Promise<{ error: string | null }>;
   refreshTeachers: () => Promise<void>;
 }
 
@@ -127,15 +128,39 @@ export const TeacherProvider = ({ children }: { children: ReactNode }) => {
     return { error: null };
   };
 
-  const deleteTeacher = async (id: string) => {
-    const { error } = await supabase.from("teachers").delete().eq("id", id);
-    if (!error) {
-      setTeachers((prev) => prev.filter((t) => t.id !== id));
+  const updateTeacher = async (id: string, updates: Partial<Teacher>): Promise<{ error: string | null }> => {
+    const { data, error } = await supabase
+      .from("teachers")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating teacher:", error);
+      return { error: error.message };
     }
+
+    if (data) {
+      setTeachers((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...data } : t))
+      );
+    }
+    return { error: null };
+  };
+
+  const deleteTeacher = async (id: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.from("teachers").delete().eq("id", id);
+    if (error) {
+      console.error("Error deleting teacher:", error);
+      return { error: error.message };
+    }
+    setTeachers((prev) => prev.filter((t) => t.id !== id));
+    return { error: null };
   };
 
   return (
-    <TeacherContext.Provider value={{ teachers, loading, addTeacher, deleteTeacher, refreshTeachers: fetchTeachers }}>
+    <TeacherContext.Provider value={{ teachers, loading, addTeacher, updateTeacher, deleteTeacher, refreshTeachers: fetchTeachers }}>
       {children}
     </TeacherContext.Provider>
   );

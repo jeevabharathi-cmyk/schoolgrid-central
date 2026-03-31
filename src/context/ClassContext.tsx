@@ -11,6 +11,7 @@ export type Section = {
 export type ClassItem = {
   id: string;
   name: string;
+  order: number;
   sections: Section[];
 };
 
@@ -21,6 +22,8 @@ interface ClassContextType {
   addSection: (classId: string, name: string) => Promise<{ data: Section | null; error: string | null }>;
   updateSection: (id: string, name: string) => Promise<{ error: string | null }>;
   deleteSection: (id: string) => Promise<{ error: string | null }>;
+  deleteClass: (id: string) => Promise<{ error: string | null }>;
+  updateClass: (id: string, name: string, order?: number) => Promise<{ error: string | null }>;
   refreshClasses: () => Promise<void>;
 }
 
@@ -51,6 +54,7 @@ export const ClassProvider = ({ children }: { children: ReactNode }) => {
       const formattedClasses = (classesData || []).map((c: any) => ({
         id: c.id,
         name: c.name,
+        order: c.order || 0,
         sections: (sectionsData || []).filter((s: any) => s.class_id === c.id),
       }));
       setClasses(formattedClasses);
@@ -73,7 +77,7 @@ export const ClassProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) return { data: null, error: error.message };
 
-    const newClass: ClassItem = { id: data.id, name: data.name, sections: [] };
+    const newClass: ClassItem = { id: data.id, name: data.name, order: data.order || 0, sections: [] };
     setClasses((prev) => [...prev, newClass]);
     return { data: newClass, error: null };
   };
@@ -126,6 +130,31 @@ export const ClassProvider = ({ children }: { children: ReactNode }) => {
     return { error: null };
   };
 
+  const deleteClass = async (id: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.from("classes").delete().eq("id", id);
+    if (error) return { error: error.message };
+
+    setClasses((prev) => prev.filter((c) => c.id !== id));
+    return { error: null };
+  };
+
+  const updateClass = async (id: string, name: string, order?: number): Promise<{ error: string | null }> => {
+    const updateData: any = { name };
+    if (order !== undefined) updateData.order = order;
+
+    const { error } = await supabase
+      .from("classes")
+      .update(updateData)
+      .eq("id", id);
+
+    if (error) return { error: error.message };
+
+    setClasses((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, name, order: order ?? c.order } : c))
+    );
+    return { error: null };
+  };
+
   return (
     <ClassContext.Provider
       value={{
@@ -135,6 +164,8 @@ export const ClassProvider = ({ children }: { children: ReactNode }) => {
         addSection,
         updateSection,
         deleteSection,
+        deleteClass,
+        updateClass,
         refreshClasses: fetchClasses,
       }}
     >

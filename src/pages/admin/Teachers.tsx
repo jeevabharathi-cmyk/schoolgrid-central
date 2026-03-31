@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, MoreHorizontal, Mail, Phone, Edit, UserX, X, CheckCircle2, User, BookMarked, School, Calendar, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useTeachers } from "@/context/TeacherContext";
+import { useTeachers, Teacher } from "@/context/TeacherContext";
+import { toast } from "sonner";
+import { AlertTriangle, Loader2 } from "lucide-react";
 
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
-const Modal = ({ open, onClose, title, subtitle, icon: Icon, children }: {
+const Modal = ({ open, onClose, title, subtitle, icon: Icon, children, danger = false }: {
   open: boolean; onClose: () => void; title: string; subtitle?: string;
-  icon: React.ElementType; children: React.ReactNode;
+  icon: React.ElementType; children: React.ReactNode; danger?: boolean;
 }) => {
   if (!open) return null;
   return (
@@ -25,7 +27,7 @@ const Modal = ({ open, onClose, title, subtitle, icon: Icon, children }: {
         transition={{ duration: 0.2, ease: "easeOut" }}
         className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl bg-card shadow-2xl"
       >
-        <div className="bg-primary px-6 py-4">
+        <div className={`${danger ? "bg-destructive" : "bg-primary"} px-6 py-4`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20">
@@ -145,10 +147,134 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
   );
 };
 
+// ─── Edit Teacher Modal ───────────────────────────────────────────────────────
+const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: () => void; teacher: Teacher | null }) => {
+  const { updateTeacher } = useTeachers();
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (teacher) {
+      setName(teacher.full_name);
+      setPhone(teacher.phone);
+      setEmail(teacher.email);
+      setSubject(teacher.subjects[0] || "");
+    }
+  }, [teacher]);
+
+  if (!open || !teacher) return null;
+
+  const handleUpdate = async () => {
+    if (!name || !phone || !subject) return;
+    setLoading(true);
+    const { error } = await updateTeacher(teacher.id, {
+      full_name: name,
+      phone,
+      email,
+      subjects: [subject],
+    });
+    setLoading(false);
+
+    if (!error) {
+      toast.success("Teacher profile updated");
+      onClose();
+    } else {
+      toast.error(`Error: ${error}`);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Edit Teacher" subtitle="Update staff member details" icon={Edit}>
+      <form onSubmit={(e) => { e.preventDefault(); handleUpdate(); }} className="px-6 pb-6 pt-4 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Full Name *</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="pl-9" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phone *</label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-3" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Email</label>
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} className="pl-3" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Subject *</label>
+            <Select value={subject} onValueChange={setSubject}>
+              <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+              <SelectContent>
+                {["Mathematics", "Science", "English", "Hindi", "Social Science", "Physical Education"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="flex-1" disabled={loading}>
+            {loading ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// ─── Delete Teacher Modal ─────────────────────────────────────────────────────
+const DeleteTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: () => void; teacher: Teacher | null }) => {
+  const { deleteTeacher } = useTeachers();
+  const [loading, setLoading] = useState(false);
+
+  if (!open || !teacher) return null;
+
+  const handleDelete = async () => {
+    setLoading(true);
+    const { error } = await deleteTeacher(teacher.id);
+    setLoading(false);
+
+    if (!error) {
+      toast.success("Teacher removed successfully");
+      onClose();
+    } else {
+      toast.error(`Error removing teacher: ${error}`);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Remove Teacher" subtitle="This action cannot be undone" icon={AlertTriangle} danger>
+      <div className="px-6 pb-6 pt-4 space-y-4">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <p className="text-sm text-foreground">
+            Are you sure you want to remove <strong className="text-destructive">{teacher.full_name}</strong>?
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            This will permanently delete their account and associated assignments.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={handleDelete} disabled={loading}>
+            {loading ? "Removing..." : "Remove Teacher"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const TeachersPage = () => {
   const { teachers, loading } = useTeachers();
   const [search, setSearch] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
 
   const filtered = teachers.filter((t) =>
     t.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -228,7 +354,14 @@ const TeachersPage = () => {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedTeacher(teacher); setEditModalOpen(true); }}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { setSelectedTeacher(teacher); setDeleteModalOpen(true); }}>
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -239,6 +372,8 @@ const TeachersPage = () => {
         </Card>
       </motion.div>
       <AddTeacherModal open={addModalOpen} onClose={() => setAddModalOpen(false)} />
+      <EditTeacherModal open={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedTeacher(null); }} teacher={selectedTeacher} />
+      <DeleteTeacherModal open={deleteModalOpen} onClose={() => { setDeleteModalOpen(false); setSelectedTeacher(null); }} teacher={selectedTeacher} />
     </>
   );
 };

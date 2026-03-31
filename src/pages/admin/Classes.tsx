@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useClasses, ClassItem, Section } from "@/context/ClassContext";
+import { toast } from "sonner";
 
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
 const Modal = ({
@@ -73,18 +74,24 @@ const Field = ({
 
 // ─── Classes Page ─────────────────────────────────────────────────────────────
 const ClassesPage = () => {
-  const { classes, loading, addClass, addSection, updateSection, deleteSection } = useClasses();
+  const { classes, loading, addClass, deleteClass, updateClass, addSection, updateSection, deleteSection } = useClasses();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Modal states
   const [addClassOpen, setAddClassOpen] = useState(false);
+  const [editClassObj, setEditClassObj] = useState<ClassItem | null>(null);
+  const [deleteClassObj, setDeleteClassObj] = useState<ClassItem | null>(null);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [editSectionObj, setEditSectionObj] = useState<Section | null>(null);    
   const [deleteSectionObj, setDeleteSectionObj] = useState<Section | null>(null); 
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Form values
   const [newClassName, setNewClassName] = useState("");
   const [newClassNum, setNewClassNum] = useState("");
+  const [editClassName, setEditClassName] = useState("");
+  const [editClassNum, setEditClassNum] = useState("");
   const [newSectionName, setNewSectionName] = useState("");
   const [editSectionName, setEditSectionName] = useState("");
 
@@ -111,6 +118,36 @@ const ClassesPage = () => {
     }
   };
 
+  const handleUpdateClass = async () => {
+    if (!editClassName.trim() || !editClassObj) return;
+    const { error } = await updateClass(editClassObj.id, editClassName.trim(), parseInt(editClassNum) || 0);
+    if (!error) {
+      setEditClassObj(null);
+      setEditClassName("");
+      setEditClassNum("");
+    }
+  };
+
+  const handleDeleteClass = async () => {
+    if (!deleteClassObj) return;
+    setIsDeleting(true);
+    const { error } = await deleteClass(deleteClassObj.id);
+    setIsDeleting(false);
+    
+    if (error) {
+      toast.error(`Failed to delete class: ${error}`);
+      return;
+    }
+
+    toast.success(`Class "${deleteClassObj.name}" deleted successfully`);
+    
+    if (selectedId === deleteClassObj.id) {
+      const nextId = classes.find(c => c.id !== deleteClassObj.id)?.id || null;
+      setSelectedId(nextId);
+    }
+    setDeleteClassObj(null);
+  };
+
   const handleAddSection = async () => {
     if (!newSectionName.trim() || !selectedId) return;
     const letter = newSectionName.trim().toUpperCase();
@@ -133,9 +170,12 @@ const ClassesPage = () => {
   const handleDeleteSection = async () => {
     if (!deleteSectionObj) return;
     const { error } = await deleteSection(deleteSectionObj.id);
-    if (!error) {
-      setDeleteSectionObj(null);
+    if (error) {
+      toast.error(`Failed to delete section: ${error}`);
+      return;
     }
+    toast.success(`Section "${deleteSectionObj.name}" deleted successfully`);
+    setDeleteSectionObj(null);
   };
 
   const closeAddClass = () => { setAddClassOpen(false); setNewClassName(""); setNewClassNum(""); setAddClassSuccess(false); };
@@ -175,13 +215,35 @@ const ClassesPage = () => {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -8 }}
                       onClick={() => setSelectedId(cls.id)}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors ${selectedId === cls.id
+                      className={`group relative flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors ${selectedId === cls.id
                           ? "bg-primary text-primary-foreground"
                           : "text-foreground hover:bg-secondary"
                         }`}
                     >
                       <span className="font-medium">{cls.name}</span>
                       <div className="flex items-center gap-2">
+                        <div className={`flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity ${selectedId === cls.id ? "text-primary-foreground" : ""}`}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditClassObj(cls);
+                              setEditClassName(cls.name);
+                              setEditClassNum(cls.order.toString());
+                            }}
+                            className="p-1 rounded hover:bg-white/20"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteClassObj(cls);
+                            }}
+                            className="p-1 rounded hover:bg-white/20"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
                         <Badge
                           variant={selectedId === cls.id ? "outline" : "secondary"}
                           className={`text-xs ${selectedId === cls.id ? "border-primary-foreground/30 text-primary-foreground" : ""}`}
@@ -436,6 +498,84 @@ const ClassesPage = () => {
               onClick={handleDeleteSection}
             >
               <Trash2 className="mr-2 h-4 w-4" /> Delete Section
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Edit Class Modal ───────────────────────────────────────────── */}
+      <Modal
+        open={editClassObj !== null}
+        onClose={() => { setEditClassObj(null); setEditClassName(""); setEditClassNum(""); }}
+        title="Edit Class"
+        subtitle="Update class details"
+        icon={Edit}
+      >
+        <div className="px-6 pb-6 pt-4 space-y-4">
+          <Field
+            label="Class Name *"
+            value={editClassName}
+            onChange={setEditClassName}
+            placeholder="e.g. Class 12"
+          />
+          <Field
+            label="Class Number / Grade"
+            value={editClassNum}
+            onChange={setEditClassNum}
+            placeholder="e.g. 12"
+          />
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => { setEditClassObj(null); setEditClassName(""); setEditClassNum(""); }}>
+              Cancel
+            </Button>
+            <Button
+              className={`flex-1 text-primary-foreground ${editClassName.trim() ? "bg-primary hover:bg-primary/90" : "bg-muted text-muted-foreground cursor-not-allowed"}`}
+              onClick={handleUpdateClass}
+              disabled={!editClassName.trim()}
+            >
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Delete Class Confirm Modal ─────────────────────────────────── */}
+      <Modal
+        open={deleteClassObj !== null}
+        onClose={() => setDeleteClassObj(null)}
+        title="Delete Class"
+        subtitle="This action cannot be undone"
+        icon={AlertTriangle}
+        danger
+      >
+        <div className="px-6 pb-6 pt-4 space-y-4">
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+            <p className="text-sm text-foreground">
+              Are you sure you want to delete <strong className="text-destructive">{deleteClassObj?.name}</strong>?
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This will also permanently delete <strong>{deleteClassObj?.sections.length} sections</strong> and all associated data (timetable, homework, etc.).
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteClassObj(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteClass}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete Class
+                </>
+              )}
             </Button>
           </div>
         </div>
