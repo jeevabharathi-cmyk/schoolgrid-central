@@ -473,10 +473,10 @@ const TimetablePage = () => {
                     <Card className="overflow-hidden">
                         <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-3">
                             <CardTitle className="text-sm font-semibold">
-                                {selectedClass} – Section {selectedSection} · Weekly Schedule
+                                {selectedClass?.name} – Section {selectedSection?.name} · Weekly Schedule
                             </CardTitle>
-                            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setTimetables((p) => ({ ...p, [tableKey]: {} }))}>
-                                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Clear All
+                            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={fetchTimetable}>
+                                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
                             </Button>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -530,13 +530,14 @@ const TimetablePage = () => {
                                                         }
                                                         const periodNo = period.no as number;
                                                         const slot = getSlot(dayIndex, periodNo);
-                                                        const colorCls = slot ? (SUBJECT_COLORS[slot.subject] ?? "bg-gray-100 text-gray-800 border-gray-200") : "";
-                                                        const teacher = slot ? TEACHERS.find((t) => t.id === slot.teacherId) : null;
+                                                        const subject = subjects.find(s => s.id === slot?.subjectId);
+                                                        const colorCls = subject ? (SUBJECT_COLORS[subject.name] ?? "bg-gray-100 text-gray-800 border-gray-200") : "";
+                                                        const teacher = slot ? teachers.find((t) => t.id === slot.teacherId) : null;
 
                                                         return (
                                                             <td key={day} className="border-b border-r border-border px-1.5 py-1.5 last:border-r-0">
                                                                 <AnimatePresence mode="wait">
-                                                                    {slot ? (
+                                                                    {slot && subject ? (
                                                                         <motion.div
                                                                             key="filled"
                                                                             initial={{ opacity: 0, scale: 0.9 }}
@@ -545,11 +546,11 @@ const TimetablePage = () => {
                                                                             className={`group relative rounded-lg border px-2 py-1.5 ${colorCls} cursor-pointer`}
                                                                             onClick={() => setEditModal({ day: dayIndex, period: periodNo })}
                                                                         >
-                                                                            <p className="text-[11px] font-bold leading-tight truncate">{slot.subject}</p>
+                                                                            <p className="text-[11px] font-bold leading-tight truncate">{subject.name}</p>
                                                                             <div className="mt-0.5 flex items-center gap-1">
                                                                                 <User className="h-2.5 w-2.5 shrink-0" />
                                                                                 <p className="text-[10px] truncate opacity-80">
-                                                                                    {teacher?.name.split(" ").slice(-1)[0]}
+                                                                                    {teacher?.full_name?.split(" ").slice(-1)[0] ?? "N/A"}
                                                                                 </p>
                                                                             </div>
                                                                             {/* Edit overlay on hover */}
@@ -594,15 +595,15 @@ const TimetablePage = () => {
                 )}
 
                 {/* Subject Legend */}
-                {hasTimetable && (
+                {subjects.length > 0 && (
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Subject Legend</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-wrap gap-2">
-                                {Object.entries(SUBJECT_COLORS).map(([subj, cls]) => (
-                                    <span key={subj} className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${cls}`}>{subj}</span>
+                                {subjects.map((subj) => (
+                                    <span key={subj.id} className={`rounded-lg border px-2.5 py-1 text-xs font-medium ${SUBJECT_COLORS[subj.name] ?? "bg-gray-100 border-gray-200"}`}>{subj.name}</span>
                                 ))}
                             </div>
                         </CardContent>
@@ -610,29 +611,32 @@ const TimetablePage = () => {
                 )}
 
                 {/* Staff Overview */}
-                {hasTimetable && (
+                {selectedClass && (
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-semibold">Assigned Staff — {selectedClass} Section {selectedSection}</CardTitle>
+                            <CardTitle className="text-sm font-semibold">Assigned Staff — {selectedClass.name} Section {selectedSection?.name}</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                {TEACHERS.map((teacher) => {
+                                {teachers.map((teacher) => {
                                     const slots = Object.values(timetable).filter((s) => s.teacherId === teacher.id);
                                     if (slots.length === 0) return null;
                                     return (
                                         <div key={teacher.id} className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 px-3 py-3">
                                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                                                {teacher.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                                                {teacher.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-xs font-semibold text-foreground truncate">{teacher.name}</p>
-                                                <p className="text-[10px] text-muted-foreground">{teacher.subject}</p>
+                                                <p className="text-xs font-semibold text-foreground truncate">{teacher.full_name}</p>
+                                                <p className="text-[10px] text-muted-foreground">{teacher.subjects.join(", ")}</p>
                                                 <Badge variant="secondary" className="mt-0.5 text-[10px]">{slots.length} period{slots.length !== 1 ? "s" : ""}</Badge>
                                             </div>
                                         </div>
                                     );
                                 })}
+                                {Object.keys(timetable).length === 0 && (
+                                    <p className="col-span-full py-4 text-center text-xs text-muted-foreground">No staff assigned yet.</p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -649,6 +653,8 @@ const TimetablePage = () => {
                     time={PERIODS.find((p) => !("isBreak" in p) && p.no === editModal.period)?.time ?? ""}
                     currentSlot={getSlot(editModal.day, editModal.period)}
                     onSave={(slot) => saveSlot(editModal.day, editModal.period, slot)}
+                    subjects={subjects}
+                    teachers={teachers}
                 />
             )}
 
