@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Clock, Edit, Plus, Calendar, User, BookOpen, X, CheckCircle2,
-    ChevronDown, Printer, RefreshCw
+    ChevronDown, Printer, RefreshCw, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/lib/supabase";
+import { useClasses } from "@/context/ClassContext";
+import { useTeachers, Teacher } from "@/context/TeacherContext";
+import { toast } from "sonner";
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
