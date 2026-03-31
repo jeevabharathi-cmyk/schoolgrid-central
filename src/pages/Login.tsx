@@ -1,24 +1,62 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { GraduationCap, Eye, EyeOff } from "lucide-react";
+import { GraduationCap, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
+  const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginType, setLoginType] = useState<"admin" | "teacher" | "parent">("admin");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginType === "admin") navigate("/admin");
-    else if (loginType === "teacher") navigate("/teacher");
-    else navigate("/parent");
+
+    if (loginType !== "admin") {
+      // Teacher/Parent OTP flow – keep the old mock navigation for now
+      if (loginType === "teacher") navigate("/teacher");
+      else navigate("/parent");
+      return;
+    }
+
+    // Admin login via Supabase
+    if (!email || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter both email and password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    const { error, session } = await signIn(email, password);
+    setIsLoading(false);
+
+    if (error || !session) {
+      toast({
+        title: "Login Failed",
+        description: error?.message || "Invalid email or password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Welcome back!",
+      description: "You have been signed in successfully.",
+    });
+    navigate("/admin");
   };
 
   return (
@@ -65,6 +103,7 @@ const Login = () => {
                     placeholder="admin@school.edu"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -76,6 +115,7 @@ const Login = () => {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
                     />
                     <button
                       type="button"
@@ -107,10 +147,26 @@ const Login = () => {
                 <p className="text-xs text-muted-foreground">We'll send you a one-time verification code</p>
               </div>
             )}
-            <Button type="submit" className="w-full">
-              {loginType === "admin" ? "Sign In" : "Send OTP"}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : loginType === "admin" ? (
+                "Sign In"
+              ) : (
+                "Send OTP"
+              )}
             </Button>
           </form>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Don't have an account?{" "}
+            <Link to="/signup" className="font-medium text-primary hover:underline">
+              Sign up
+            </Link>
+          </p>
         </div>
         <p className="mt-4 text-center text-xs text-muted-foreground">SchoolConnect Pro v1.0</p>
       </motion.div>
