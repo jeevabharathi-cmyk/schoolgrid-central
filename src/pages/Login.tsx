@@ -1,5 +1,11 @@
 import { useState } from "react";
+<<<<<<< HEAD
 import { useNavigate, Link } from "react-router-dom";
+=======
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+>>>>>>> 66170bb9eac0dc9ddd02217cf9ffdfdec836c7ff
 import { motion } from "framer-motion";
 import { GraduationCap, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +27,7 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+<<<<<<< HEAD
 
     if (loginType !== "admin") {
       // Teacher/Parent OTP flow – keep the old mock navigation for now
@@ -57,6 +64,28 @@ const Login = () => {
       description: "You have been signed in successfully.",
     });
     navigate("/admin");
+=======
+    if (loginType === "admin") {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          toast.error("Invalid credentials or no admin user exists yet!");
+          return;
+        }
+        toast.success("Successfully logged in!");
+        navigate("/admin");
+      } catch (err: any) {
+        toast.error(err.message);
+      }
+    } else {
+      toast.info("OTP login for Teachers/Parents is not fully integrated yet. Redirecting...");
+      if (loginType === "teacher") navigate("/teacher");
+      else navigate("/parent");
+    }
+>>>>>>> 66170bb9eac0dc9ddd02217cf9ffdfdec836c7ff
   };
 
   return (
