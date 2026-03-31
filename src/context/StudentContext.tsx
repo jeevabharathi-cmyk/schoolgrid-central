@@ -197,6 +197,32 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return { error: error.message };
     }
 
+    // Sync parent info back to students table for mobile app consistency
+    const { data: parentProfile } = await supabase
+      .from("profiles")
+      .select("full_name, email, phone")
+      .eq("id", parentId)
+      .single();
+
+    if (parentProfile) {
+      await supabase
+        .from("students")
+        .update({
+          parent_name: parentProfile.full_name,
+          parent_email: parentProfile.email,
+          parent_phone: parentProfile.phone,
+        })
+        .eq("id", studentId);
+      
+      // Update local state if needed
+      setStudents(prev => prev.map(s => s.id === studentId ? {
+        ...s,
+        parent: parentProfile.full_name,
+        email: parentProfile.email,
+        phone: parentProfile.phone
+      } : s));
+    }
+
     return { error: null };
   };
 
