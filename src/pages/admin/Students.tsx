@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,13 +7,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useStudents } from "@/context/StudentContext";
-import { User, FileText, Calendar, School, BookOpen, Users, Phone, Mail, MapPin, CheckCircle2, X } from "lucide-react";
+import { useStudents, Student } from "@/context/StudentContext";
+import { User, FileText, Calendar, School, BookOpen, Users, Phone, Mail, MapPin, CheckCircle2, X, Edit, Trash2, UserPlus, AlertTriangle, Search as SearchIcon, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 // ─── Modal Wrapper (Reuse for consistency) ───
-const Modal = ({ open, onClose, title, subtitle, icon: Icon, children }: {
+const Modal = ({ open, onClose, title, subtitle, icon: Icon, children, danger = false }: {
   open: boolean; onClose: () => void; title: string; subtitle?: string;
-  icon: React.ElementType; children: React.ReactNode;
+  icon: React.ElementType; children: React.ReactNode; danger?: boolean;
 }) => {
   if (!open) return null;
   return (
@@ -26,7 +28,7 @@ const Modal = ({ open, onClose, title, subtitle, icon: Icon, children }: {
         transition={{ duration: 0.2, ease: "easeOut" }}
         className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl bg-card shadow-2xl"
       >
-        <div className="bg-primary px-6 py-4">
+        <div className={`${danger ? "bg-destructive" : "bg-primary"} px-6 py-4`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20">
@@ -155,11 +157,212 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
   );
 };
 
+// ─── Edit Student Modal ───────────────────────────────────────────────────────
+const EditStudentModal = ({ open, onClose, student }: { open: boolean; onClose: () => void; student: Student | null }) => {
+  const { updateStudent } = useStudents();
+  const [name, setName] = useState("");
+  const [admNo, setAdmNo] = useState("");
+  const [studentClass, setStudentClass] = useState("");
+  const [section, setSection] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (student) {
+      setName(student.name);
+      setAdmNo(student.admNo);
+      setStudentClass(student.class);
+      setSection(student.section);
+    }
+  }, [student]);
+
+  if (!open || !student) return null;
+
+  const handleUpdate = async () => {
+    if (!name || !studentClass || !section) return;
+    setLoading(true);
+    const { error } = await updateStudent(student.id, {
+      name,
+      admNo,
+      class: studentClass,
+      section,
+    });
+    setLoading(false);
+
+    if (!error) {
+      toast.success("Student details updated");
+      onClose();
+    } else {
+      toast.error(`Error: ${error}`);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Edit Student" subtitle="Update profile information" icon={Edit}>
+      <form onSubmit={(e) => { e.preventDefault(); handleUpdate(); }} className="px-6 pb-6 pt-4 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Full Name *</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Adm. No.</label>
+            <Input value={admNo} onChange={(e) => setAdmNo(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Class *</label>
+            <Select value={studentClass} onValueChange={setStudentClass}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["5", "6", "7", "8", "9", "10"].map(c => <SelectItem key={c} value={c}>Class {c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Section *</label>
+            <Select value={section} onValueChange={setSection}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["A", "B", "C", "D"].map(s => <SelectItem key={s} value={s}>Section {s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button type="submit" className="flex-1" disabled={loading}>
+            {loading ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// ─── Delete Student Modal ─────────────────────────────────────────────────────
+const DeleteStudentModal = ({ open, onClose, student }: { open: boolean; onClose: () => void; student: Student | null }) => {
+  const { deleteStudent } = useStudents();
+  const [loading, setLoading] = useState(false);
+
+  if (!open || !student) return null;
+
+  const handleDelete = async () => {
+    setLoading(true);
+    const { error } = await deleteStudent(student.id);
+    setLoading(false);
+
+    if (!error) {
+      toast.success("Student removed successfully");
+      onClose();
+    } else {
+      toast.error(`Error: ${error}`);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Remove Student" subtitle="Danger zone" icon={AlertTriangle} danger>
+      <div className="px-6 pb-6 pt-4 space-y-4">
+        <p className="text-sm">Are you sure you want to remove <strong className="text-destructive">{student.name}</strong>?</p>
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button className="flex-1 bg-destructive hover:bg-destructive/90" onClick={handleDelete} disabled={loading}>
+            {loading ? "Removing..." : "Remove Student"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ─── Assign Parent Modal ──────────────────────────────────────────────────────
+const AssignParentModal = ({ open, onClose, student }: { open: boolean; onClose: () => void; student: Student | null }) => {
+  const { assignParent } = useStudents();
+  const [parents, setParents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      const fetchParents = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, phone")
+          .eq("role", "parent");
+        
+        if (!error) setParents(data || []);
+        setLoading(false);
+      };
+      fetchParents();
+    }
+  }, [open]);
+
+  const handleAssign = async (parentId: string) => {
+    if (!student) return;
+    setAssigning(parentId);
+    const { error } = await assignParent(student.id, parentId);
+    setAssigning(null);
+
+    if (!error) {
+      toast.success("Parent assigned successfully");
+    } else {
+      toast.error(`Error: ${error}`);
+    }
+  };
+
+  if (!open || !student) return null;
+
+  const filtered = parents.filter(p => 
+    p.full_name?.toLowerCase().includes(search.toLowerCase()) || 
+    p.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Modal open={open} onClose={onClose} title="Assign Parent" subtitle={`Select parent for ${student.name}`} icon={UserPlus}>
+      <div className="px-6 pb-6 pt-4 space-y-4">
+        <div className="relative">
+          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Search parents..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+
+        <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+          {loading ? (
+             <div className="flex py-10 justify-center items-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : filtered.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">No parents found</p>
+          ) : (
+            filtered.map((parent) => (
+              <div key={parent.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">{parent.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{parent.email}</p>
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={() => handleAssign(parent.id)}
+                  disabled={assigning === parent.id}
+                >
+                  {assigning === parent.id ? "Linking..." : "Assign"}
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+        <Button variant="outline" className="w-full" onClick={onClose}>Close</Button>
+      </div>
+    </Modal>
+  );
+};
+
 const StudentsPage = () => {
   const { students, loading } = useStudents();
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("all");
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const filtered = students.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.admNo.includes(search);
@@ -234,7 +437,35 @@ const StudentsPage = () => {
                       <td className="hidden px-4 py-3 text-sm text-muted-foreground sm:table-cell">{student.section}</td>
                       <td className="hidden px-4 py-3 text-sm text-muted-foreground md:table-cell">{student.parent}</td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="sm" className="text-xs">View</Button>
+                        <div className="flex justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0" 
+                            onClick={() => { setSelectedStudent(student); setEditModalOpen(true); }}
+                            title="Edit Student"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={() => { setSelectedStudent(student); setAssignModalOpen(true); }}
+                            title="Assign Parent"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => { setSelectedStudent(student); setDeleteModalOpen(true); }}
+                            title="Delete Student"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -245,6 +476,9 @@ const StudentsPage = () => {
         </Card>
       </motion.div>
       <AddStudentModal open={addModalOpen} onClose={() => setAddModalOpen(false)} />
+      <EditStudentModal open={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedStudent(null); }} student={selectedStudent} />
+      <DeleteStudentModal open={deleteModalOpen} onClose={() => { setDeleteModalOpen(false); setSelectedStudent(null); }} student={selectedStudent} />
+      <AssignParentModal open={assignModalOpen} onClose={() => { setAssignModalOpen(false); setSelectedStudent(null); }} student={selectedStudent} />
     </>
   );
 };
