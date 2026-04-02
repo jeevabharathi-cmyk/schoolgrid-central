@@ -60,11 +60,13 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
   const [teacherClass, setTeacherClass] = useState("");
   const [address, setAddress] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
+  const [loading, setLoading] = useState(false);
 
   if (!open) return null;
 
   const handleAdd = async () => {
     if (!name || !phone || !subject) return;
+    setLoading(true);
     const { error } = await addTeacher({
       name,
       phone,
@@ -75,8 +77,13 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
       address,
       joiningDate
     });
+    setLoading(false);
+    
     if (!error) {
       setSubmitted(true);
+      toast.success("Teacher added successfully");
+    } else {
+      toast.error(`Error adding teacher: ${error}`);
     }
   };
 
@@ -130,15 +137,15 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
               <Select value={teacherClass} onValueChange={setTeacherClass}>
                 <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
                 <SelectContent>
-                  {["5", "6", "7", "8", "9", "10"].map(c => <SelectItem key={c} value={c}>Class {c}</SelectItem>)}
+                  {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={handleClose}>Cancel</Button>
-            <Button className="flex-1" onClick={handleAdd} disabled={!name || !phone || !subject}>
-              Add Teacher
+            <Button className="flex-1" onClick={handleAdd} disabled={!name || !phone || !subject || loading}>
+              {loading ? "Adding..." : "Add Teacher"}
             </Button>
           </div>
         </div>
@@ -154,6 +161,7 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
+  const [teacherClass, setTeacherClass] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -162,6 +170,7 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
       setPhone(teacher.phone);
       setEmail(teacher.email);
       setSubject(teacher.subjects[0] || "");
+      setTeacherClass(teacher.classes?.[0] || "");
     }
   }, [teacher]);
 
@@ -175,6 +184,7 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
       phone,
       email,
       subjects: [subject],
+      classes: teacherClass ? [teacherClass] : [],
     });
     setLoading(false);
 
@@ -211,6 +221,15 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
               <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
               <SelectContent>
                 {["Mathematics", "Science", "English", "Hindi", "Social Science", "Physical Education"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Assigned Class</label>
+            <Select value={teacherClass} onValueChange={setTeacherClass}>
+              <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+              <SelectContent>
+                {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
