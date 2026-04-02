@@ -195,7 +195,9 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
           <div className="grid grid-cols-2 gap-4">
             <select value={studentClass} onChange={(e) => setStudentClass(e.target.value)} className="rounded-lg border p-2 text-sm">
               <option value="">Select Class *</option>
-              {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
             <input value={section} onChange={(e) => setSection(e.target.value)} placeholder="Section *" className="w-full rounded-lg border p-2 text-sm" />
           </div>

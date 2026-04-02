@@ -117,7 +117,7 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
               <Select value={studentClass} onValueChange={setStudentClass}>
                 <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
                 <SelectContent>
-                  {["5", "6", "7", "8", "9", "10"].map(c => <SelectItem key={c} value={c}>Class {c}</SelectItem>)}
+                  {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -213,7 +213,7 @@ const EditStudentModal = ({ open, onClose, student }: { open: boolean; onClose: 
             <Select value={studentClass} onValueChange={setStudentClass}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {["5", "6", "7", "8", "9", "10"].map(c => <SelectItem key={c} value={c}>Class {c}</SelectItem>)}
+                {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

@@ -176,7 +176,40 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const assignParent = async (studentId: string, parentId: string): Promise<{ error: string | null }> => {
-    // Check if link already exists
+    // 1. Fetch parent profile first (to get details and verify it's a valid parent)
+    const { data: parentProfile, error: profileError } = await supabase
+      .from("profiles")
+      .select("full_name, email, phone")
+      .eq("id", parentId)
+      .single();
+
+    if (profileError || !parentProfile) {
+      return { error: "Parent profile not found" };
+    }
+
+    // 2. Ensure record exists in the 'parents' table (required for foreign key)
+    const { data: parentRecord } = await supabase
+      .from("parents")
+      .select("id")
+      .eq("id", parentId)
+      .single();
+
+    if (!parentRecord) {
+      // Create empty parent record if missing
+      const { error: createParentError } = await supabase
+        .from("parents")
+        .insert({
+          id: parentId,
+          father_name: parentProfile.full_name // Defaulting full_name to father_name for initial setup
+        });
+
+      if (createParentError) {
+        console.error("Error creating parent record:", createParentError);
+        return { error: `Could not initialize parent record: ${createParentError.message}` };
+      }
+    }
+
+    // 3. Check if link already exists in student_parents
     const { data: existing } = await supabase
       .from("student_parents")
       .select("*")
@@ -188,40 +221,33 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return { error: "Parent already assigned to this student" };
     }
 
-    const { error } = await supabase
+    // 4. Create the link
+    const { error: linkError } = await supabase
       .from("student_parents")
       .insert({ student_id: studentId, parent_id: parentId });
 
-    if (error) {
-      console.error("Error linking parent:", error);
-      return { error: error.message };
+    if (linkError) {
+      console.error("Error linking parent:", linkError);
+      return { error: linkError.message };
     }
 
-    // Sync parent info back to students table for mobile app consistency
-    const { data: parentProfile } = await supabase
-      .from("profiles")
-      .select("full_name, email, phone")
-      .eq("id", parentId)
-      .single();
-
-    if (parentProfile) {
-      await supabase
-        .from("students")
-        .update({
-          parent_name: parentProfile.full_name,
-          parent_email: parentProfile.email,
-          parent_phone: parentProfile.phone,
-        })
-        .eq("id", studentId);
-      
-      // Update local state if needed
-      setStudents(prev => prev.map(s => s.id === studentId ? {
-        ...s,
-        parent: parentProfile.full_name,
-        email: parentProfile.email,
-        phone: parentProfile.phone
-      } : s));
-    }
+    // 5. Sync parent info back to students table for mobile app consistency
+    await supabase
+      .from("students")
+      .update({
+        parent_name: parentProfile.full_name,
+        parent_email: parentProfile.email,
+        parent_phone: parentProfile.phone,
+      })
+      .eq("id", studentId);
+    
+    // Update local state
+    setStudents(prev => prev.map(s => s.id === studentId ? {
+      ...s,
+      parent: parentProfile.full_name,
+      email: parentProfile.email,
+      phone: parentProfile.phone
+    } : s));
 
     return { error: null };
   };
