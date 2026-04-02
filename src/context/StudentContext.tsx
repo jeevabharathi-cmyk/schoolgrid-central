@@ -35,6 +35,7 @@ interface StudentContextType {
   updateStudent: (id: string, updates: Partial<Student>) => Promise<{ error: string | null }>;
   deleteStudent: (id: string) => Promise<{ error: string | null }>;
   assignParent: (studentId: string, parentId: string) => Promise<{ error: string | null }>;
+  importStudents: (studentsData: any[]) => Promise<{ error: string | null; count: number }>;
   refreshStudents: () => Promise<void>;
 }
 
@@ -75,9 +76,63 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchStudents();
-    }
+    if (!session) return;
+
+    fetchStudents();
+
+    const channel = supabase
+      .channel('public:students')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'students'
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const s = payload.new;
+            setStudents((prev) => {
+              if (prev.some(item => item.id === s.id)) return prev;
+              return [{
+                id: s.id,
+                name: s.name || "",
+                admNo: s.admission_no || "",
+                class: s.class_name || "",
+                section: s.section || "",
+                parent: s.parent_name || "",
+                email: s.parent_email || "",
+                phone: s.parent_phone || "",
+                dob: s.dob || "",
+                address: s.address || "",
+              }, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const s = payload.new as any;
+            setStudents((prev) =>
+              prev.map((item) => (item.id === s.id ? {
+                ...item,
+                name: s.name || "",
+                admNo: s.admission_no || "",
+                class: s.class_name || "",
+                section: s.section || "",
+                parent: s.parent_name || "",
+                email: s.parent_email || "",
+                phone: s.parent_phone || "",
+                dob: s.dob || "",
+                address: s.address || "",
+              } : item))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setStudents((prev) => prev.filter((item) => item.id === payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [session, fetchStudents]);
 
   const enrollStudent = async (newStudent: NewStudent): Promise<{ error: string | null }> => {
@@ -252,6 +307,37 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     return { error: null };
   };
 
+  const importStudents = async (studentsData: any[]): Promise<{ error: string | null; count: number }> => {
+    const studentsToInsert = studentsData.map(s => ({
+      name: s.name || s.full_name,
+      admission_no: s.admission_no || s.admNo || s.adm_no || `ADM${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      class_name: s.class || s.className || s.class_name,
+      section: s.section,
+      parent_name: s.parent || s.parent_name || s.parentName,
+      parent_phone: s.phone || s.parent_phone || s.parentPhone || null,
+      parent_email: s.email || s.parent_email || s.parentEmail || null,
+      dob: s.dob || null,
+      address: s.address || null,
+    }));
+
+    const { data, error } = await supabase
+      .from("students")
+      .insert(studentsToInsert)
+      .select();
+
+    if (error) {
+      console.error("Error importing students:", error);
+      return { error: error.message, count: 0 };
+    }
+
+    if (data) {
+      fetchStudents();
+      return { error: null, count: data.length };
+    }
+
+    return { error: null, count: 0 };
+  };
+
   return (
     <StudentContext.Provider value={{
       students,
@@ -260,6 +346,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       updateStudent,
       deleteStudent,
       assignParent,
+      importStudents,
       refreshStudents: fetchStudents
     }}>
       {children}

@@ -11,7 +11,6 @@ import TeachersPage from "./pages/admin/Teachers";
 import StudentsPage from "./pages/admin/Students";
 import ClassesPage from "./pages/admin/Classes";
 import SubjectsPage from "./pages/admin/Subjects";
-import SchoolSetup from "./pages/admin/SchoolSetup";
 import NotificationsPage from "./pages/admin/Notifications";
 import { AssignmentsPage, AnalyticsPage, SettingsPage } from "./pages/admin/Placeholder";
 import ViewProfile from "./pages/admin/ViewProfile";
@@ -44,7 +43,6 @@ const App = () => (
                     <Route path="/signup" element={<SignUp />} />
                     <Route path="/admin" element={<AdminLayout />}>
                       <Route index element={<AdminDashboard />} />
-                      <Route path="setup" element={<SchoolSetup />} />
                       <Route path="classes" element={<ClassesPage />} />
                       <Route path="subjects" element={<SubjectsPage />} />
                       <Route path="teachers" element={<TeachersPage />} />

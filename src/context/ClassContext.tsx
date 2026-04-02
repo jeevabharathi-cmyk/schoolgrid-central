@@ -63,9 +63,28 @@ export const ClassProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchClasses();
-    }
+    if (!session) return;
+
+    fetchClasses();
+
+    const classChannel = supabase
+      .channel('public:classes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'classes' }, () => {
+        fetchClasses();
+      })
+      .subscribe();
+
+    const sectionChannel = supabase
+      .channel('public:sections')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, () => {
+        fetchClasses();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(classChannel);
+      supabase.removeChannel(sectionChannel);
+    };
   }, [session, fetchClasses]);
 
   const addClass = async (name: string, order?: number): Promise<{ data: ClassItem | null; error: string | null }> => {

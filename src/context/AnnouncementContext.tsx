@@ -42,9 +42,28 @@ export const AnnouncementProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchAnnouncements();
-    }
+    if (!session) return;
+
+    fetchAnnouncements();
+
+    const channel = supabase
+      .channel('public:announcements')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'announcements'
+        },
+        () => {
+          fetchAnnouncements();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [session, fetchAnnouncements]);
 
   const postAnnouncement = async (announcement: Partial<Announcement>): Promise<{ data: Announcement | null; error: string | null }> => {

@@ -267,7 +267,19 @@ const TimetablePage = () => {
                 setSubjects(data || []);
             }
         };
+        
         fetchSubjects();
+
+        const channel = supabase
+            .channel('public:subjects')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'subjects' }, () => {
+                fetchSubjects();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     // Fetch timetable
@@ -298,7 +310,29 @@ const TimetablePage = () => {
 
     useEffect(() => {
         fetchTimetable();
-    }, [fetchTimetable]);
+
+        if (!selectedClassId || !selectedSectionId) return;
+
+        const channel = supabase
+            .channel(`public:timetable:${selectedClassId}:${selectedSectionId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'timetable',
+                    filter: `class_id=eq.${selectedClassId}`
+                },
+                () => {
+                    fetchTimetable();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchTimetable, selectedClassId, selectedSectionId]);
 
     const getSlot = (dayIndex: number, periodNo: number): Slot | null =>
         timetable[`${dayIndex}-${periodNo}`] ?? null;

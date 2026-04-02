@@ -241,7 +241,24 @@ const SubjectsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (session) fetchSubjects();
+    if (!session) return;
+    
+    fetchSubjects();
+
+    const channel = supabase
+      .channel('public:subjects')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subjects' },
+        () => {
+          fetchSubjects();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [session, fetchSubjects]);
 
   const filtered = subjects.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));

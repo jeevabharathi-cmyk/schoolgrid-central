@@ -34,6 +34,7 @@ interface TeacherContextType {
   addTeacher: (teacher: NewTeacher) => Promise<{ error: string | null }>;
   updateTeacher: (id: string, teacher: Partial<Teacher>) => Promise<{ error: string | null }>;
   deleteTeacher: (id: string) => Promise<{ error: string | null }>;
+  importTeachers: (teachersData: any[]) => Promise<{ error: string | null; count: number }>;
   refreshTeachers: () => Promise<void>;
 }
 
@@ -75,9 +76,53 @@ export const TeacherProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchTeachers();
-    }
+    if (!session) return;
+
+    fetchTeachers();
+
+    const channel = supabase
+      .channel('public:teachers')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'teachers'
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const t = payload.new;
+            setTeachers((prev) => {
+              if (prev.some(item => item.id === t.id)) return prev;
+              return [{
+                id: t.id,
+                full_name: t.full_name,
+                phone: t.phone || "",
+                email: t.email || "",
+                subjects: t.subjects || [],
+                classes: t.classes || [],
+                status: t.status || "active",
+                department: t.department,
+                address: t.address,
+                joining_date: t.joining_date,
+                school_id: t.school_id,
+              }, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const t = payload.new as any;
+            setTeachers((prev) =>
+              prev.map((item) => (item.id === t.id ? { ...item, ...t } : item))
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setTeachers((prev) => prev.filter((item) => item.id === payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [session, fetchTeachers]);
 
   const addTeacher = async (newTeacher: NewTeacher): Promise<{ error: string | null }> => {
@@ -159,8 +204,41 @@ export const TeacherProvider = ({ children }: { children: ReactNode }) => {
     return { error: null };
   };
 
+  const importTeachers = async (teachersData: any[]): Promise<{ error: string | null; count: number }> => {
+    const schoolId = session?.user?.user_metadata?.school_id || null;
+    
+    const teachersToInsert = teachersData.map(t => ({
+      full_name: t.full_name || t.name, // Support both 'full_name' and 'name' headers
+      phone: t.phone || null,
+      email: t.email || null,
+      subjects: typeof t.subjects === 'string' ? t.subjects.split(',').map((s: string) => s.trim()) : (Array.isArray(t.subjects) ? t.subjects : []),
+      classes: typeof t.classes === 'string' ? t.classes.split(',').map((c: string) => c.trim()) : (Array.isArray(t.classes) ? t.classes : []),
+      status: t.status || 'active',
+      address: t.address || null,
+      joining_date: t.joining_date || null,
+      school_id: schoolId
+    }));
+
+    const { data, error } = await supabase
+      .from("teachers")
+      .insert(teachersToInsert)
+      .select();
+
+    if (error) {
+      console.error("Error importing teachers:", error);
+      return { error: error.message, count: 0 };
+    }
+
+    if (data) {
+      fetchTeachers();
+      return { error: null, count: data.length };
+    }
+
+    return { error: null, count: 0 };
+  };
+
   return (
-    <TeacherContext.Provider value={{ teachers, loading, addTeacher, updateTeacher, deleteTeacher, refreshTeachers: fetchTeachers }}>
+    <TeacherContext.Provider value={{ teachers, loading, addTeacher, updateTeacher, deleteTeacher, importTeachers, refreshTeachers: fetchTeachers }}>
       {children}
     </TeacherContext.Provider>
   );

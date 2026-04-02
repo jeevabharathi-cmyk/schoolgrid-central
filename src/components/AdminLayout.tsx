@@ -12,7 +12,6 @@ import HelpCenter from "@/components/HelpCenter";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/admin" },
-  { title: "School Setup", icon: Settings, path: "/admin/setup" },
   { title: "Classes & Sections", icon: Grid3X3, path: "/admin/classes" },
   { title: "Timetable", icon: CalendarDays, path: "/admin/timetable" },
   { title: "Subjects", icon: BookOpen, path: "/admin/subjects" },

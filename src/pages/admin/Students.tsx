@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Filter } from "lucide-react";
+import { Search, Plus, Filter, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { useStudents, Student } from "@/context/StudentContext";
 import { User, FileText, Calendar, School, BookOpen, Users, Phone, Mail, MapPin, CheckCircle2, X, Edit, Trash2, UserPlus, AlertTriangle, Search as SearchIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import Papa from "papaparse";
 
 // ─── Modal Wrapper (Reuse for consistency) ───
 const Modal = ({ open, onClose, title, subtitle, icon: Icon, children, danger = false }: {
@@ -355,7 +356,7 @@ const AssignParentModal = ({ open, onClose, student }: { open: boolean; onClose:
 };
 
 const StudentsPage = () => {
-  const { students, loading } = useStudents();
+  const { students, loading, importStudents } = useStudents();
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("all");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -363,6 +364,50 @@ const StudentsPage = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const downloadTemplate = () => {
+    const headers = ["name", "adm_no", "class", "section", "parent", "phone", "email"];
+    const sampleData = ["Aarav Mehta", "ADM001234", "Class 5", "A", "Mr. Sunil Mehta", "+91 9876543210", "parent@example.com"];
+    const csvContent = [headers, sampleData].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "students_template.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.info("Template downloaded. Fill it and upload.");
+  };
+
+  const handleImportCSV = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const { error, count } = await importStudents(results.data);
+        if (error) {
+          toast.error(`Import failed: ${error}`);
+        } else {
+          toast.success(`Successfully imported ${count} students`);
+        }
+        // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      },
+      error: (error) => {
+        toast.error(`CSV Parsing error: ${error.message}`);
+      }
+    });
+  };
 
   const filtered = students.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.admNo.includes(search);
@@ -379,7 +424,19 @@ const StudentsPage = () => {
             <p className="text-sm text-muted-foreground">{students.length} students enrolled</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">Import CSV</Button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileUpload} 
+              accept=".csv" 
+              className="hidden" 
+            />
+            <Button variant="outline" size="sm" onClick={downloadTemplate} className="text-xs">
+              Download Template
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleImportCSV}>
+              <Upload className="mr-1.5 h-4 w-4" /> Import CSV
+            </Button>
             <Button size="sm" onClick={() => setAddModalOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" /> Add Student
             </Button>
