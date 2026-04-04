@@ -36,10 +36,6 @@ const SchoolSetup = () => (
               <Input defaultValue="#2563EB" className="flex-1" />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>Academic Year</Label>
-            <Input defaultValue="2024-2025" />
-          </div>
         </CardContent>
       </Card>
     </div>

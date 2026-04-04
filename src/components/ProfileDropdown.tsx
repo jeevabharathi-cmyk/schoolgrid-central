@@ -28,7 +28,6 @@ export interface ProfileDropdownProps {
         role: UserRole;
         avatar: string; // initials
         school: string;
-        academicYear: string;
         lastLogin: string;
         status: "Active" | "Inactive";
     };
@@ -63,9 +62,6 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user }) => {
                         <div className="space-y-0.5">
                             <h3 className="text-base font-bold leading-tight">{user.name}</h3>
                             <p className="text-xs text-primary-foreground/80 font-medium">{user.email}</p>
-                            <Badge variant="secondary" className="mt-1.5 bg-primary-foreground/10 text-[10px] font-black uppercase text-primary-foreground border-none hover:bg-primary-foreground/20">
-                                {user.role}
-                            </Badge>
                         </div>
                     </div>
                 </div>
@@ -73,13 +69,9 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user }) => {
                 {/* Info Section */}
                 <div className="p-4 space-y-4 bg-card">
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                        <div className="space-y-1">
+                        <div className="space-y-1 col-span-2">
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">School</p>
                             <p className="text-xs font-semibold text-foreground truncate">{user.school}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Academic Year</p>
-                            <p className="text-xs font-semibold text-foreground">{user.academicYear}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Last Login</p>
@@ -100,13 +92,6 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ user }) => {
 
                     {/* Actions */}
                     <div className="space-y-1 py-1">
-                        <DropdownMenuItem className="flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-secondary transition-colors group">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/5 text-primary group-hover:bg-primary/10">
-                                <User className="h-4 w-4" />
-                            </div>
-                            <span className="text-sm font-medium text-foreground">View Profile</span>
-                        </DropdownMenuItem>
-
                         <DropdownMenuItem className="flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-secondary transition-colors group">
                             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/5 text-primary group-hover:bg-primary/10">
                                 <Settings className="h-4 w-4" />

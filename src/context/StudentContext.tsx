@@ -13,6 +13,10 @@ export type Student = {
   phone?: string;
   dob?: string;
   address?: string;
+  enrollmentDate?: string;
+  classId?: string;
+  sectionId?: string;
+  isLinked?: boolean;
 };
 
 // Shape from the "Add Student" form
@@ -26,6 +30,9 @@ export type NewStudent = {
   phone?: string;
   dob?: string;
   address?: string;
+  enrollmentDate?: string;
+  classId?: string;
+  sectionId?: string;
 };
 
 interface StudentContextType {
@@ -35,6 +42,7 @@ interface StudentContextType {
   updateStudent: (id: string, updates: Partial<Student>) => Promise<{ error: string | null }>;
   deleteStudent: (id: string) => Promise<{ error: string | null }>;
   assignParent: (studentId: string, parentId: string) => Promise<{ error: string | null }>;
+  unassignParent: (studentId: string, parentId: string) => Promise<{ error: string | null }>;
   importStudents: (studentsData: any[]) => Promise<{ error: string | null; count: number }>;
   refreshStudents: () => Promise<void>;
 }
@@ -50,7 +58,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("students")
-      .select("*")
+      .select("*, student_parents(parent_id)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -69,6 +77,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           phone: s.parent_phone || "",
           dob: s.dob || "",
           address: s.address || "",
+          enrollmentDate: s.enrollment_date || (s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : ""),
+          classId: s.class_id || "",
+          sectionId: s.section_id || "",
+          isLinked: s.student_parents && s.student_parents.length > 0,
         }))
       );
     }
@@ -105,6 +117,10 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
                 phone: s.parent_phone || "",
                 dob: s.dob || "",
                 address: s.address || "",
+                enrollmentDate: s.enrollment_date || (s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : ""),
+                classId: s.class_id || "",
+                sectionId: s.section_id || "",
+                isLinked: false, // New students are never linked immediately
               }, ...prev];
             });
           } else if (payload.eventType === 'UPDATE') {
@@ -121,6 +137,12 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
                 phone: s.parent_phone || "",
                 dob: s.dob || "",
                 address: s.address || "",
+                enrollmentDate: s.enrollment_date || (s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : ""),
+                classId: s.class_id || "",
+                sectionId: s.section_id || "",
+                // Keep the current link status on generic updates unless we implement 
+                // link sensing in real-time
+                isLinked: item.isLinked, 
               } : item))
             );
           } else if (payload.eventType === 'DELETE') {
@@ -148,6 +170,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         parent_email: newStudent.email || null,
         dob: newStudent.dob || null,
         address: newStudent.address || null,
+        class_id: newStudent.classId || null,
+        section_id: newStudent.sectionId || null,
+        // enrollment_date: newStudent.enrollmentDate || null, // Temporarily disabled while column is missing
       })
       .select()
       .single();
@@ -170,6 +195,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           phone: data.parent_phone || "",
           dob: data.dob || "",
           address: data.address || "",
+          enrollmentDate: data.enrollment_date || (data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : ""),
+          classId: data.class_id || "",
+          sectionId: data.section_id || "",
         },
         ...prev,
       ]);
@@ -191,6 +219,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
         parent_email: updates.email,
         dob: updates.dob,
         address: updates.address,
+        class_id: updates.classId,
+        section_id: updates.sectionId,
+        // enrollment_date: updates.enrollmentDate, // Temporarily disabled while column is missing
       })
       .eq("id", id)
       .select()
@@ -214,6 +245,9 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
           phone: data.parent_phone || "",
           dob: data.dob || "",
           address: data.address || "",
+          enrollmentDate: data.enrollment_date || (data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : ""),
+          classId: data.class_id || "",
+          sectionId: data.section_id || "",
         } : s))
       );
     }
@@ -231,6 +265,17 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const assignParent = async (studentId: string, parentId: string): Promise<{ error: string | null }> => {
+    // 0. Check if student already has a parent (Enforce one parent rule)
+    const { data: existingAnyLink, error: checkError } = await supabase
+      .from("student_parents")
+      .select("parent_id")
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    if (existingAnyLink) {
+      return { error: "This student is already assigned to a parent. Unassign them first to link to a different parent." };
+    }
+
     // 1. Fetch parent profile first (to get details and verify it's a valid parent)
     const { data: parentProfile, error: profileError } = await supabase
       .from("profiles")
@@ -242,51 +287,52 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       return { error: "Parent profile not found" };
     }
 
-    // 2. Ensure record exists in the 'parents' table (required for foreign key)
-    const { data: parentRecord } = await supabase
-      .from("parents")
-      .select("id")
-      .eq("id", parentId)
-      .single();
-
-    if (!parentRecord) {
-      // Create empty parent record if missing
-      const { error: createParentError } = await supabase
-        .from("parents")
-        .insert({
-          id: parentId,
-          father_name: parentProfile.full_name // Defaulting full_name to father_name for initial setup
-        });
-
-      if (createParentError) {
-        console.error("Error creating parent record:", createParentError);
-        return { error: `Could not initialize parent record: ${createParentError.message}` };
-      }
-    }
-
-    // 3. Check if link already exists in student_parents
-    const { data: existing } = await supabase
+    // 2. Try to link directly first (if the parent record already exists in the 'parents' table)
+    const { data: existingLink } = await supabase
       .from("student_parents")
       .select("*")
       .eq("student_id", studentId)
       .eq("parent_id", parentId)
-      .single();
+      .maybeSingle();
 
-    if (existing) {
+    if (existingLink) {
       return { error: "Parent already assigned to this student" };
     }
 
-    // 4. Create the link
-    const { error: linkError } = await supabase
+    const { error: directLinkError } = await supabase
       .from("student_parents")
       .insert({ student_id: studentId, parent_id: parentId });
 
-    if (linkError) {
-      console.error("Error linking parent:", linkError);
-      return { error: linkError.message };
+    if (directLinkError) {
+      // If it failed because the parent record doesn't exist in the 'parents' table (FK violation)
+      // we try to initialize it.
+      if (directLinkError.code === '23503') {
+        const { error: createParentError } = await supabase
+          .from("parents")
+          .insert({
+            id: parentId,
+            father_name: parentProfile.full_name
+          });
+
+        if (createParentError) {
+          console.error("Error creating parent record:", createParentError);
+          return { error: `Database RLS Error: Could not initialize parent record. Please run the SQL fix in the Implementation Plan. (${createParentError.message})` };
+        }
+
+        // Retry the link after initialization
+        const { error: retryLinkError } = await supabase
+          .from("student_parents")
+          .insert({ student_id: studentId, parent_id: parentId });
+
+        if (retryLinkError) {
+          return { error: `Failed to link after initialization: ${retryLinkError.message}` };
+        }
+      } else {
+        return { error: `Linking failed: ${directLinkError.message}` };
+      }
     }
 
-    // 5. Sync parent info back to students table for mobile app consistency
+    // 3. Sync parent info back to students table for mobile app consistency
     await supabase
       .from("students")
       .update({
@@ -301,8 +347,29 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       ...s,
       parent: parentProfile.full_name,
       email: parentProfile.email,
-      phone: parentProfile.phone
+      phone: parentProfile.phone,
+      isLinked: true
     } : s));
+
+    return { error: null };
+  };
+
+  const unassignParent = async (studentId: string, parentId: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase
+      .from("student_parents")
+      .delete()
+      .eq("student_id", studentId)
+      .eq("parent_id", parentId);
+
+    if (error) {
+      console.error("Error unassigning parent:", error);
+      return { error: error.message };
+    }
+
+    // Update local state isLinked status
+    setStudents((prev) =>
+      prev.map((s) => (s.id === studentId ? { ...s, isLinked: false, parent: "", email: "", phone: "" } : s))
+    );
 
     return { error: null };
   };
@@ -318,6 +385,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       parent_email: s.email || s.parent_email || s.parentEmail || null,
       dob: s.dob || null,
       address: s.address || null,
+      // enrollment_date: s.enrollmentDate || s.enrollment_date || null,
     }));
 
     const { data, error } = await supabase
@@ -346,6 +414,7 @@ export const StudentProvider = ({ children }: { children: ReactNode }) => {
       updateStudent,
       deleteStudent,
       assignParent,
+      unassignParent,
       importStudents,
       refreshStudents: fetchStudents
     }}>

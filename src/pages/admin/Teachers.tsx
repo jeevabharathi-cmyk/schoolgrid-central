@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeachers, Teacher } from "@/context/TeacherContext";
+import { useClasses } from "@/context/ClassContext";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import Papa from "papaparse";
 
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
@@ -58,22 +60,34 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
-  const [teacherClass, setTeacherClass] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState("");
   const [address, setAddress] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [loading, setLoading] = useState(false);
+  const [createdTeacherId, setCreatedTeacherId] = useState<string | null>(null);
+
+  const { classes: allClasses } = useClasses();
+  const selectedClass = allClasses.find(c => c.id === selectedClassId);
+  const sections = selectedClass?.sections || [];
 
   if (!open) return null;
 
   const handleAdd = async () => {
     if (!name || !phone || !subject) return;
     setLoading(true);
-    const { error } = await addTeacher({
+    
+    const targetSection = sections.find(s => s.id === selectedSectionId);
+    const classDisplay = selectedClass ? (targetSection ? `${selectedClass.name} - ${targetSection.name}` : selectedClass.name) : "";
+
+    const { data, error } = await addTeacher({
       name,
       phone,
       email,
       subjects: [subject],
-      classes: teacherClass ? [teacherClass] : [],
+      classes: classDisplay ? [classDisplay] : [],
+      classId: selectedClassId,
+      sectionId: selectedSectionId,
       status: "active",
       address,
       joiningDate
@@ -81,6 +95,9 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
     setLoading(false);
     
     if (!error) {
+      if (data?.teacher_id) {
+        setCreatedTeacherId(data.teacher_id);
+      }
       setSubmitted(true);
       toast.success("Teacher added successfully");
     } else {
@@ -90,7 +107,8 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
 
   const handleClose = () => {
     setSubmitted(false);
-    setName(""); setPhone(""); setEmail(""); setSubject(""); setTeacherClass("");
+    setName(""); setPhone(""); setEmail(""); setSubject(""); 
+    setSelectedClassId(""); setSelectedSectionId("");
     setAddress(""); setJoiningDate("");
     onClose();
   };
@@ -103,6 +121,9 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
             <CheckCircle2 className="h-7 w-7" />
           </div>
           <h3 className="text-base font-bold text-foreground">Teacher Registered!</h3>
+          <div className="rounded-lg bg-secondary/50 px-4 py-2 border border-border/50">
+            <span className="text-sm font-mono font-bold text-primary">{createdTeacherId}</span>
+          </div>
           <p className="text-sm text-muted-foreground"><strong>{name}</strong> has been added to the registry.</p>
           <Button className="mt-2 bg-primary text-primary-foreground" onClick={handleClose}>Done</Button>
         </div>
@@ -134,11 +155,20 @@ const AddTeacherModal = ({ open, onClose }: { open: boolean; onClose: () => void
               </Select>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Assigned Class</label>
-              <Select value={teacherClass} onValueChange={setTeacherClass}>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Class</label>
+              <Select value={selectedClassId} onValueChange={(val) => { setSelectedClassId(val); setSelectedSectionId(""); }}>
                 <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
                 <SelectContent>
-                  {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Section</label>
+              <Select value={selectedSectionId} onValueChange={setSelectedSectionId} disabled={!selectedClassId}>
+                <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+                <SelectContent>
+                  {sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -162,8 +192,13 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
-  const [teacherClass, setTeacherClass] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { classes: allClasses } = useClasses();
+  const selectedClass = allClasses.find(c => c.id === selectedClassId);
+  const sections = selectedClass?.sections || [];
 
   useEffect(() => {
     if (teacher) {
@@ -171,7 +206,8 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
       setPhone(teacher.phone);
       setEmail(teacher.email);
       setSubject(teacher.subjects[0] || "");
-      setTeacherClass(teacher.classes?.[0] || "");
+      setSelectedClassId(teacher.classId || "");
+      setSelectedSectionId(teacher.sectionId || "");
     }
   }, [teacher]);
 
@@ -180,13 +216,19 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
   const handleUpdate = async () => {
     if (!name || !phone || !subject) return;
     setLoading(true);
+
+    const targetSection = sections.find(s => s.id === selectedSectionId);
+    const classDisplay = selectedClass ? (targetSection ? `${selectedClass.name} - ${targetSection.name}` : selectedClass.name) : "";
+
     const { error } = await updateTeacher(teacher.id, {
       full_name: name,
       phone,
       email,
       subjects: [subject],
-      classes: teacherClass ? [teacherClass] : [],
-    });
+      classes: classDisplay ? [classDisplay] : [],
+      classId: selectedClassId,
+      sectionId: selectedSectionId,
+    } as any);
     setLoading(false);
 
     if (!error) {
@@ -201,6 +243,10 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
     <Modal open={open} onClose={onClose} title="Edit Teacher" subtitle="Update staff member details" icon={Edit}>
       <form onSubmit={(e) => { e.preventDefault(); handleUpdate(); }} className="px-6 pb-6 pt-4 space-y-4">
         <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Teacher ID (Read-only)</label>
+            <Input value={teacher.teacher_id || "---"} disabled className="bg-secondary/30 font-mono text-primary" />
+          </div>
           <div className="col-span-2">
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Full Name *</label>
             <div className="relative">
@@ -226,11 +272,20 @@ const EditTeacherModal = ({ open, onClose, teacher }: { open: boolean; onClose: 
             </Select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Assigned Class</label>
-            <Select value={teacherClass} onValueChange={setTeacherClass}>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Class</label>
+            <Select value={selectedClassId} onValueChange={(val) => { setSelectedClassId(val); setSelectedSectionId(""); }}>
               <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
               <SelectContent>
-                {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Section</label>
+            <Select value={selectedSectionId} onValueChange={setSelectedSectionId} disabled={!selectedClassId}>
+              <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+              <SelectContent>
+                {sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -389,6 +444,7 @@ const TeachersPage = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">ID</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Name</th>
                     <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground md:table-cell">Contact</th>
                     <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground lg:table-cell">Subjects</th>
@@ -400,6 +456,9 @@ const TeachersPage = () => {
                 <tbody>
                   {filtered.map((teacher) => (
                     <tr key={teacher.id} className="border-b border-border/50 transition-colors hover:bg-secondary/30">
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-mono font-medium text-primary">{teacher.teacher_id || "---"}</span>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">

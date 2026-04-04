@@ -40,7 +40,6 @@ const AdminLayout = () => {
     role: "SUPER ADMIN" as const,
     avatar: "AD",
     school: "Delhi Public School",
-    academicYear: "2024 - 2025",
     lastLogin: "Today, 9:41 AM",
     status: "Active" as const,
   };
@@ -113,14 +112,9 @@ const AdminLayout = () => {
             </button>
             <div>
               <h2 className="text-sm font-semibold text-foreground">Delhi Public School</h2>
-              <p className="text-xs text-muted-foreground">Academic Year 2024-2025</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
-            </button>
             <ProfileDropdown user={adminUser} />
           </div>
         </header>

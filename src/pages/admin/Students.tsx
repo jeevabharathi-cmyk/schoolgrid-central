@@ -58,27 +58,49 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
   const [name, setName] = useState("");
   const [admNo, setAdmNo] = useState("");
   const [dob, setDob] = useState("");
-  const [studentClass, setStudentClass] = useState("");
-  const [section, setSection] = useState("");
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [parentEmail, setParentEmail] = useState("");
   const [address, setAddress] = useState("");
+  const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      const fetchData = async () => {
+        const { data: cls } = await supabase.from("classes").select("*").order("name");
+        const { data: sec } = await supabase.from("sections").select("*").order("name");
+        setClasses(cls || []);
+        setSections(sec || []);
+      };
+      fetchData();
+    }
+  }, [open]);
 
   if (!open) return null;
 
   const handleEnroll = async () => {
-    if (!name || !studentClass || !section || !parentName || !parentPhone) return;
+    if (!name || !selectedClassId || !selectedSectionId || !parentName || !parentPhone) return;
+    
+    const selectedClass = classes.find(c => c.id === selectedClassId);
+    const selectedSection = sections.find(s => s.id === selectedSectionId);
+
     const { error } = await enrollStudent({
       name,
       admNo: admNo || `ADM${Date.now().toString().slice(-6)}`,
-      class: studentClass,
-      section,
+      class: selectedClass?.name || "",
+      section: selectedSection?.name || "",
+      classId: selectedClassId,
+      sectionId: selectedSectionId,
       parent: parentName,
       email: parentEmail,
       phone: parentPhone,
       dob,
-      address
+      address,
+      enrollmentDate
     });
     if (!error) {
       setSubmitted(true);
@@ -87,7 +109,8 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
 
   const handleClose = () => {
     setSubmitted(false);
-    setName(""); setAdmNo(""); setDob(""); setStudentClass(""); setSection("");
+    setName(""); setAdmNo(""); setDob(""); 
+    setSelectedClassId(""); setSelectedSectionId("");
     setParentName(""); setParentPhone(""); setParentEmail(""); setAddress("");
     onClose();
   };
@@ -115,19 +138,26 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Class *</label>
-              <Select value={studentClass} onValueChange={setStudentClass}>
+              <Select value={selectedClassId} onValueChange={setSelectedClassId}>
                 <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
                 <SelectContent>
-                  {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {classes.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Section *</label>
-              <Select value={section} onValueChange={setSection}>
+              <Select value={selectedSectionId} onValueChange={setSelectedSectionId} disabled={!selectedClassId}>
                 <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
                 <SelectContent>
-                  {["A", "B", "C", "D"].map(s => <SelectItem key={s} value={s}>Section {s}</SelectItem>)}
+                  {sections
+                    .filter(s => s.class_id === selectedClassId)
+                    .map(s => (
+                      <SelectItem key={s.id} value={s.id}>Section {s.name}</SelectItem>
+                    ))
+                  }
                 </SelectContent>
               </Select>
             </div>
@@ -145,10 +175,34 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
                 <Input value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} placeholder="+91 98765 43210" className="pl-9" />
               </div>
             </div>
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Student Address</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <textarea 
+                  value={address} 
+                  onChange={(e) => setAddress(e.target.value)} 
+                  placeholder="Street, City, Zip" 
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-none" 
+                />
+              </div>
+            </div>
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Enrollment Date *</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input 
+                  type="date" 
+                  value={enrollmentDate} 
+                  onChange={(e) => setEnrollmentDate(e.target.value)} 
+                  className="pl-9" 
+                />
+              </div>
+            </div>
           </div>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={handleClose}>Cancel</Button>
-            <Button className="flex-1" onClick={handleEnroll} disabled={!name || !studentClass || !section || !parentName || !parentPhone}>
+            <Button className="flex-1" onClick={handleEnroll} disabled={!name || !selectedClassId || !selectedSectionId || !parentName || !parentPhone}>
               Enroll Student
             </Button>
           </div>
@@ -163,29 +217,53 @@ const EditStudentModal = ({ open, onClose, student }: { open: boolean; onClose: 
   const { updateStudent } = useStudents();
   const [name, setName] = useState("");
   const [admNo, setAdmNo] = useState("");
-  const [studentClass, setStudentClass] = useState("");
-  const [section, setSection] = useState("");
+  const [address, setAddress] = useState("");
+  const [enrollmentDate, setEnrollmentDate] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [classes, setClasses] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: cls } = await supabase.from("classes").select("*").order("name");
+      const { data: sec } = await supabase.from("sections").select("*").order("name");
+      setClasses(cls || []);
+      setSections(sec || []);
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
     if (student) {
       setName(student.name);
       setAdmNo(student.admNo);
-      setStudentClass(student.class);
-      setSection(student.section);
+      setAddress(student.address || "");
+      setEnrollmentDate(student.enrollmentDate || "");
+      setSelectedClassId(student.classId || "");
+      setSelectedSectionId(student.sectionId || "");
     }
   }, [student]);
 
   if (!open || !student) return null;
 
   const handleUpdate = async () => {
-    if (!name || !studentClass || !section) return;
+    if (!name || !selectedClassId || !selectedSectionId) return;
     setLoading(true);
+
+    const selectedClass = classes.find(c => c.id === selectedClassId);
+    const selectedSection = sections.find(s => s.id === selectedSectionId);
+
     const { error } = await updateStudent(student.id, {
       name,
       admNo,
-      class: studentClass,
-      section,
+      class: selectedClass?.name || "",
+      section: selectedSection?.name || "",
+      classId: selectedClassId,
+      sectionId: selectedSectionId,
+      address,
+      enrollmentDate
     });
     setLoading(false);
 
@@ -211,21 +289,51 @@ const EditStudentModal = ({ open, onClose, student }: { open: boolean; onClose: 
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Class *</label>
-            <Select value={studentClass} onValueChange={setStudentClass}>
+            <Select value={selectedClassId} onValueChange={setSelectedClassId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {classes.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Section *</label>
-            <Select value={section} onValueChange={setSection}>
+            <Select value={selectedSectionId} onValueChange={setSelectedSectionId} disabled={!selectedClassId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {["A", "B", "C", "D"].map(s => <SelectItem key={s} value={s}>Section {s}</SelectItem>)}
+                {sections
+                  .filter(s => s.class_id === selectedClassId)
+                  .map(s => (
+                    <SelectItem key={s.id} value={s.id}>Section {s.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Student Address</label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <textarea 
+                value={address} 
+                onChange={(e) => setAddress(e.target.value)} 
+                className="w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-none" 
+              />
+            </div>
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Enrollment Date *</label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input 
+                type="date" 
+                value={enrollmentDate} 
+                onChange={(e) => setEnrollmentDate(e.target.value)} 
+                className="pl-9" 
+              />
+            </div>
           </div>
         </div>
         <div className="flex gap-3 pt-2">
@@ -276,27 +384,49 @@ const DeleteStudentModal = ({ open, onClose, student }: { open: boolean; onClose
 
 // ─── Assign Parent Modal ──────────────────────────────────────────────────────
 const AssignParentModal = ({ open, onClose, student }: { open: boolean; onClose: () => void; student: Student | null }) => {
-  const { assignParent } = useStudents();
+  const { assignParent, unassignParent } = useStudents();
   const [parents, setParents] = useState<any[]>([]);
+  const [assignedParentIds, setAssignedParentIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [parentFilter, setParentFilter] = useState("all");
 
   useEffect(() => {
-    if (open) {
-      const fetchParents = async () => {
+    if (open && student) {
+      const fetchData = async () => {
         setLoading(true);
-        const { data, error } = await supabase
+        // 1. Fetch all parents
+        const { data: parentsData, error: parentsError } = await supabase
           .from("profiles")
           .select("id, full_name, email, phone")
           .eq("role", "parent");
         
-        if (!error) setParents(data || []);
+        if (!parentsError) setParents(parentsData || []);
+
+        // 2. Fetch already assigned parents for this student
+        const { data: assignedData, error: assignedError } = await supabase
+          .from("student_parents")
+          .select("parent_id")
+          .eq("student_id", student.id);
+        
+        if (!assignedError) {
+          const linkedIds = (assignedData || []).map(a => a.parent_id);
+          setAssignedParentIds(linkedIds);
+          
+          // If already assigned, default to "assigned" filter
+          if (linkedIds.length > 0) {
+            setParentFilter("assigned");
+          } else {
+            setParentFilter("all");
+          }
+        }
+
         setLoading(false);
       };
-      fetchParents();
+      fetchData();
     }
-  }, [open]);
+  }, [open, student]);
 
   const handleAssign = async (parentId: string) => {
     if (!student) return;
@@ -305,7 +435,24 @@ const AssignParentModal = ({ open, onClose, student }: { open: boolean; onClose:
     setAssigning(null);
 
     if (!error) {
+      setAssignedParentIds(prev => [...prev, parentId]);
+      setParentFilter("assigned");
       toast.success("Parent assigned successfully");
+    } else {
+      toast.error(`Error: ${error}`);
+    }
+  };
+
+  const handleUnassign = async (parentId: string) => {
+    if (!student) return;
+    setAssigning(parentId);
+    const { error } = await unassignParent(student.id, parentId);
+    setAssigning(null);
+
+    if (!error) {
+      setAssignedParentIds(prev => prev.filter(id => id !== parentId));
+      setParentFilter("all");
+      toast.success("Parent unassigned successfully");
     } else {
       toast.error(`Error: ${error}`);
     }
@@ -313,17 +460,48 @@ const AssignParentModal = ({ open, onClose, student }: { open: boolean; onClose:
 
   if (!open || !student) return null;
 
-  const filtered = parents.filter(p => 
-    p.full_name?.toLowerCase().includes(search.toLowerCase()) || 
-    p.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = parents.filter(p => {
+    const matchesSearch = p.full_name?.toLowerCase().includes(search.toLowerCase()) || 
+                         p.email?.toLowerCase().includes(search.toLowerCase());
+    const isAssigned = assignedParentIds.includes(p.id);
+    
+    if (parentFilter === "assigned") return matchesSearch && isAssigned;
+    if (parentFilter === "not-assigned") return matchesSearch && !isAssigned;
+    return matchesSearch;
+  });
 
   return (
     <Modal open={open} onClose={onClose} title="Assign Parent" subtitle={`Select parent for ${student.name}`} icon={UserPlus}>
       <div className="px-6 pb-6 pt-4 space-y-4">
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search parents..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="space-y-3">
+          {assignedParentIds.length === 0 && (
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Search parents..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          )}
+          
+          <div className="flex gap-1 rounded-lg bg-secondary/50 p-1">
+            {assignedParentIds.length > 0 ? (
+              <div className="flex-1 rounded-md bg-card px-2 py-1.5 text-xs font-bold text-primary text-center border border-primary/20">
+                Currently Assigned
+              </div>
+            ) : (
+              (["all", "assigned", "not-assigned"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setParentFilter(f)}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold capitalize transition-all ${
+                    parentFilter === f
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {f.replace("-", " ")}
+                </button>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
@@ -332,21 +510,36 @@ const AssignParentModal = ({ open, onClose, student }: { open: boolean; onClose:
           ) : filtered.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">No parents found</p>
           ) : (
-            filtered.map((parent) => (
-              <div key={parent.id} className="flex items-center justify-between rounded-lg border p-3">
-                <div>
-                  <p className="text-sm font-medium">{parent.full_name}</p>
-                  <p className="text-xs text-muted-foreground">{parent.email}</p>
+            filtered.map((parent) => {
+              const isAssigned = assignedParentIds.includes(parent.id);
+              return (
+                <div key={parent.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="text-sm font-medium">{parent.full_name}</p>
+                    <p className="text-xs text-muted-foreground">{parent.email}</p>
+                  </div>
+                  {isAssigned ? (
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => handleUnassign(parent.id)}
+                      disabled={assigning === parent.id}
+                    >
+                      {assigning === parent.id ? "Removing..." : "Unassign"}
+                    </Button>
+                  ) : (
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleAssign(parent.id)}
+                      disabled={assigning === parent.id || assignedParentIds.length > 0}
+                    >
+                      {assigning === parent.id ? "Linking..." : "Assign"}
+                    </Button>
+                  )}
                 </div>
-                <Button 
-                  size="sm" 
-                  onClick={() => handleAssign(parent.id)}
-                  disabled={assigning === parent.id}
-                >
-                  {assigning === parent.id ? "Linking..." : "Assign"}
-                </Button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
         <Button variant="outline" className="w-full" onClick={onClose}>Close</Button>
@@ -409,10 +602,19 @@ const StudentsPage = () => {
     });
   };
 
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
+
   const filtered = students.filter((s) => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.admNo.includes(search);
     const matchClass = classFilter === "all" || s.class === classFilter;
-    return matchSearch && matchClass;
+    
+    // Check if parent is formally assigned
+    const isAssigned = !!s.isLinked;
+    const matchAssignment = assignmentFilter === "all" || 
+                          (assignmentFilter === "assigned" && isAssigned) || 
+                          (assignmentFilter === "not-assigned" && !isAssigned);
+                          
+    return matchSearch && matchClass && matchAssignment;
   });
 
   return (
@@ -448,6 +650,7 @@ const StudentsPage = () => {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Search by name or admission no..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          
           <Select value={classFilter} onValueChange={setClassFilter}>
             <SelectTrigger className="w-40">
               <Filter className="mr-2 h-4 w-4" />
@@ -458,6 +661,18 @@ const StudentsPage = () => {
               {["5", "6", "7", "8", "9", "10"].map((c) => (
                 <SelectItem key={c} value={c}>Class {c}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
+            <SelectTrigger className="w-44">
+              <UserPlus className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Parent Link" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Student Records</SelectItem>
+              <SelectItem value="assigned">Assigned Students</SelectItem>
+              <SelectItem value="not-assigned">Pending Assignment</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -473,6 +688,8 @@ const StudentsPage = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Class</th>
                     <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground sm:table-cell">Section</th>
                     <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground md:table-cell">Parent</th>
+                    <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground lg:table-cell">Address</th>
+                    <th className="hidden px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground xl:table-cell">Enrolled</th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">Actions</th>
                   </tr>
                 </thead>
@@ -493,6 +710,8 @@ const StudentsPage = () => {
                       <td className="px-4 py-3"><Badge variant="secondary" className="text-xs">Class {student.class}</Badge></td>
                       <td className="hidden px-4 py-3 text-sm text-muted-foreground sm:table-cell">{student.section}</td>
                       <td className="hidden px-4 py-3 text-sm text-muted-foreground md:table-cell">{student.parent}</td>
+                      <td className="hidden px-4 py-3 text-sm text-muted-foreground lg:table-cell max-w-[150px] truncate">{student.address}</td>
+                      <td className="hidden px-4 py-3 text-sm text-muted-foreground xl:table-cell">{student.enrollmentDate}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
                           <Button 

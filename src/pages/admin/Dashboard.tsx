@@ -4,7 +4,7 @@ import {
   Users, GraduationCap, FileText, TrendingUp, Plus, Bell, BookOpen,
   ArrowUpRight, Clock, X, Mail, Phone, MapPin, User, Calendar,
   BookMarked, School, Send, Download, BarChart3, PieChart, CheckCircle2,
-  Loader2
+  Loader2, Edit, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -159,23 +159,34 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
 
   const [name, setName] = useState("");
   const [admNo, setAdmNo] = useState("");
-  const [studentClass, setStudentClass] = useState("");
-  const [section, setSection] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState("");
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const selectedClass = classes.find(c => c.id === selectedClassId);
+  const sections = selectedClass?.sections || [];
 
   if (!open) return null;
 
   const handleEnroll = async () => {
-    if (!name || !studentClass || !section || !parentName || !parentPhone) return;
+    if (!name || !selectedClassId || !selectedSectionId || !parentName || !parentPhone) return;
     setLoading(true);
+    const selectedSection = sections.find(s => s.id === selectedSectionId);
+    
     const { error } = await enrollStudent({
       name,
       admNo: admNo || `ADM${Date.now().toString().slice(-6)}`,
-      class: studentClass,
-      section,
+      class: selectedClass?.name || "",
+      section: selectedSection?.name || "",
+      classId: selectedClassId,
+      sectionId: selectedSectionId,
       parent: parentName,
       phone: parentPhone,
+      address,
+      enrollmentDate,
     });
     setLoading(false);
     if (!error) setSubmitted(true);
@@ -193,16 +204,43 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
         <div className="px-6 pb-6 pt-4 space-y-4">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Student Name *" className="w-full rounded-lg border p-2 text-sm" />
           <div className="grid grid-cols-2 gap-4">
-            <select value={studentClass} onChange={(e) => setStudentClass(e.target.value)} className="rounded-lg border p-2 text-sm">
+            <select 
+              value={selectedClassId} 
+              onChange={(e) => {
+                setSelectedClassId(e.target.value);
+                setSelectedSectionId("");
+              }} 
+              className="rounded-lg border p-2 text-sm bg-background"
+            >
               <option value="">Select Class *</option>
-              {["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"].map(c => (
-                <option key={c} value={c}>{c}</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            <input value={section} onChange={(e) => setSection(e.target.value)} placeholder="Section *" className="w-full rounded-lg border p-2 text-sm" />
+            <select 
+              value={selectedSectionId} 
+              onChange={(e) => setSelectedSectionId(e.target.value)} 
+              disabled={!selectedClassId}
+              className="rounded-lg border p-2 text-sm bg-background disabled:opacity-50"
+            >
+              <option value="">Section *</option>
+              {sections.map(s => (
+                <option key={s.id} value={s.id}>Section {s.name}</option>
+              ))}
+            </select>
           </div>
           <input value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="Parent Name *" className="w-full rounded-lg border p-2 text-sm" />
           <input value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} placeholder="Parent Phone *" className="w-full rounded-lg border p-2 text-sm" />
+          <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Student Address" className="w-full rounded-lg border p-2 text-sm min-h-[80px] resize-none" />
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Enrollment Date *</label>
+            <input 
+              type="date" 
+              value={enrollmentDate} 
+              onChange={(e) => setEnrollmentDate(e.target.value)} 
+              className="w-full rounded-lg border p-2 text-sm" 
+            />
+          </div>
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
             <Button className="flex-1 bg-primary text-primary-foreground" onClick={handleEnroll} disabled={loading}>
@@ -216,30 +254,59 @@ const AddStudentModal = ({ open, onClose }: { open: boolean; onClose: () => void
 };
 
 // ─── Post Announcement Modal ──────────────────────────────────────────────────
-const PostAnnouncementModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+const PostAnnouncementModal = ({ open, onClose, initialData }: { open: boolean; onClose: () => void; initialData?: any }) => {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [priority, setPriority] = useState<"normal" | "emergency">("normal");
-  const { postAnnouncement } = useAnnouncements();
+  const { postAnnouncement, updateAnnouncement } = useAnnouncements();
   const { classes } = useClasses();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [targetClassId, setTargetClassId] = useState("");
 
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setTitle(initialData.title);
+        setContent(initialData.content);
+        setTargetClassId(initialData.class_id || "");
+        setPriority(initialData.priority);
+      } else {
+        setTitle("");
+        setContent("");
+        setTargetClassId("");
+        setPriority("normal");
+      }
+      setSubmitted(false);
+    }
+  }, [open, initialData]);
+
   if (!open) return null;
 
   const handlePost = async () => {
     if (!title || !content) return;
     setLoading(true);
-    const { error } = await postAnnouncement({
-      title,
-      content,
-      priority,
-      class_id: targetClassId || undefined
-    });
+    
+    let result;
+    if (initialData) {
+      result = await updateAnnouncement(initialData.id, {
+        title,
+        content,
+        priority,
+        class_id: targetClassId || null
+      } as any);
+    } else {
+      result = await postAnnouncement({
+        title,
+        content,
+        priority,
+        class_id: targetClassId || undefined
+      });
+    }
+    
     setLoading(false);
-    if (!error) setSubmitted(true);
+    if (!result.error) setSubmitted(true);
   };
 
   const handleClose = () => {
@@ -252,9 +319,9 @@ const PostAnnouncementModal = ({ open, onClose }: { open: boolean; onClose: () =
       {submitted ? (
         <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600"><CheckCircle2 className="h-7 w-7" /></div>
-          <h3 className="text-base font-bold text-foreground">Announcement Posted!</h3>
-          <p className="text-sm text-muted-foreground">Your notice has been sent successfully.</p>
-          <Button className="mt-2 bg-primary text-primary-foreground" onClick={handleClose}>Done</Button>
+          <h3 className="text-base font-bold text-foreground">Announcement {initialData ? "Updated" : "Posted"}!</h3>
+          <p className="text-sm text-muted-foreground">Your notice has been {initialData ? "updated" : "sent"} successfully.</p>
+          <Button className="mt-2 bg-primary text-primary-foreground" onClick={onClose}>Done</Button>
         </div>
       ) : (
         <div className="px-6 pb-6 pt-4 space-y-4">
@@ -287,9 +354,9 @@ const PostAnnouncementModal = ({ open, onClose }: { open: boolean; onClose: () =
             </div>
           </div>
           <div className="flex gap-3 pt-1">
-            <Button variant="outline" className="flex-1" onClick={handleClose}>Cancel</Button>
+            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
             <Button className="flex-1 bg-primary text-primary-foreground" onClick={handlePost} disabled={!title || !content || loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Post Announcement</>}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> {initialData ? "Update" : "Post"} Announcement</>}
             </Button>
           </div>
         </div>
@@ -303,11 +370,28 @@ const AdminDashboard = () => {
   const [addTeacher, setAddTeacher] = useState(false);
   const [addStudent, setAddStudent] = useState(false);
   const [postAnnouncement, setPostAnnouncement] = useState(false);
+  const [editingAnn, setEditingAnn] = useState<any>(null);
   const { teachers } = useTeachers();
   const { students } = useStudents();
-  const { announcements, loading: announcementsLoading } = useAnnouncements();
+  const { announcements, loading: announcementsLoading, deleteAnnouncement } = useAnnouncements();
 
   const currentStats = getStats(teachers, students.length);
+
+  const handleDelete = async (id: string, title: string) => {
+    if (window.confirm(`Are you sure you want to delete the announcement "${title}"?`)) {
+      await deleteAnnouncement(id);
+    }
+  };
+
+  const handleEdit = (ann: any) => {
+    setEditingAnn(ann);
+    setPostAnnouncement(true);
+  };
+
+  const handleClosePostModal = () => {
+    setPostAnnouncement(false);
+    setEditingAnn(null);
+  };
 
   return (
     <>
@@ -357,7 +441,23 @@ const AdminDashboard = () => {
                             <Clock className="h-3 w-3" /> {new Date(ann.created_at).toLocaleString()}
                           </p>
                         </div>
-                        {ann.priority === 'emergency' && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Urgent</Badge>}
+                        <div className="flex items-center gap-1">
+                          {ann.priority === 'emergency' && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Urgent</Badge>}
+                          <button 
+                            onClick={() => handleEdit(ann)}
+                            className="p-1 hover:bg-primary/10 rounded text-primary transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(ann.id, ann.title)}
+                            className="p-1 hover:bg-destructive/10 rounded text-destructive transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -383,7 +483,11 @@ const AdminDashboard = () => {
 
       <AddTeacherModal open={addTeacher} onClose={() => setAddTeacher(false)} />
       <AddStudentModal open={addStudent} onClose={() => setAddStudent(false)} />
-      <PostAnnouncementModal open={postAnnouncement} onClose={() => setPostAnnouncement(false)} />
+      <PostAnnouncementModal 
+        open={postAnnouncement} 
+        onClose={handleClosePostModal} 
+        initialData={editingAnn}
+      />
     </>
   );
 };

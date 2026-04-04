@@ -114,10 +114,6 @@ const TeacherApp = () => {
             <span className="text-sm font-black text-primary tracking-tighter">SC</span>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-1.5 text-muted-foreground transition-all hover:bg-secondary/50 rounded-full">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-card bg-destructive" />
-            </button>
             <ProfileDropdown user={teacherProfile} />
           </div>
         </div>
@@ -292,10 +288,6 @@ const TeacherApp = () => {
                       <div>
                         <p className="text-muted-foreground">School</p>
                         <p className="font-medium text-foreground">Delhi Public School</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Academic Year</p>
-                        <p className="font-medium text-foreground">2024 – 2025</p>
                       </div>
                     </div>
                     <div className="flex justify-between border-t border-border/30 pt-2">
